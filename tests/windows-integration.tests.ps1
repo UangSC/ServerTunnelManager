@@ -125,6 +125,11 @@ try {
     Assert-Rejected { Invoke-TestRoute POST '/api/batch' '{"action":"delete"}' } '批量操作缺少ids拒绝而非回退全部'
     Assert-Rejected { Invoke-TestRoute POST '/api/batch' '{"action":"delete","ids":"t-test"}' } '批量操作字符串ids拒绝'
     Assert-Windows ($script:Config.tunnels.Count -eq 1) '无效批量选择不会修改配置'
+    $demoOpened = Invoke-OpenTunnel 't-test'
+    Assert-Windows ($demoOpened.status -eq 'connecting' -and $null -eq $demoOpened.pid) '演示开启不伪造真实SSH进程PID'
+    $demoRestarted = Invoke-RestartTunnel 't-test'
+    Assert-Windows ($demoRestarted.status -eq 'connecting' -and $null -eq $demoRestarted.pid) '演示重启不伪造真实SSH进程PID'
+    Invoke-CloseTunnel 't-test' | Out-Null
     function Save-Config { throw '此测试不允许持久化用户配置。' }
     Assert-Windows ((Invoke-TestRoute GET '/api/settings').applicationShortcut.supported) 'GET设置包含系统快捷图标状态'
     Assert-Rejected { Invoke-TestRoute POST '/api/application-shortcut' '{"enabled":"false"}' } '快捷图标API不接受布尔字符串'

@@ -1003,7 +1003,7 @@ function Invoke-OpenTunnel([string]$id) {
     $simulation = To-Bool (Get-Setting 'simulation' $true) $true
 
     if ($simulation) {
-        $state.pid = Get-Random -Minimum 12000 -Maximum 48000
+        $state.pid = $null # Simulation has no real SSH process.
         $state.connectAt = (NowUtc).AddMilliseconds((Get-Random -Minimum 380 -Maximum 900))
         $state.baseLatency = Get-Random -Minimum 17 -Maximum 68
         Add-Log info $tunnel.name "解析配置：127.0.0.1:$($tunnel.localPort) → $($tunnel.remoteHost):$($tunnel.remotePort)（演示模式）" -TunnelId $id -NoFile
@@ -1075,7 +1075,7 @@ function Invoke-RestartTunnel([string]$id) {
         Invoke-CloseTunnel $id | Out-Null
         $state.status = 'connecting'
         $state.statusChanged = NowUtc
-        $state.pid = Get-Random -Minimum 12000 -Maximum 48000
+        $state.pid = $null # Simulation has no real SSH process.
         $state.connectAt = (NowUtc).AddMilliseconds((Get-Random -Minimum 500 -Maximum 1000))
         $state.baseLatency = Get-Random -Minimum 17 -Maximum 68
         $state.error = ''
