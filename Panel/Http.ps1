@@ -25,8 +25,11 @@ function Receive-HttpConnection($connection, [int]$timeoutMs = 15000) {
     $client = $connection.Client
     $available = $client.Available
     if ($available -eq 0) {
-        if ($client.Client.Poll(0, [Net.Sockets.SelectMode]::SelectRead)) { return 'Closed' }
-        return 'Pending'
+        if (-not $client.Client.Poll(0, [Net.Sockets.SelectMode]::SelectRead)) { return 'Pending' }
+        # Read readiness can mean newly-arrived data, not only EOF. Bytes may
+        # arrive after the first Available check; recheck before closing.
+        $available = $client.Available
+        if ($available -eq 0) { return 'Closed' }
     }
 
     # Read only bytes already available, with a per-iteration budget for fairness.

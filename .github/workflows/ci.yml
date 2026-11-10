@@ -36,21 +36,42 @@ jobs:
           node scripts/audit-repository.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Windows PowerShell 5.1 HTTP receiver tests
-        shell: cmd
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\http.tests.ps1
+        shell: powershell
+        run: |
+          try {
+            & .\tests\http.tests.ps1
+          } catch {
+            $detail = ($_.Exception.Message + ' stack ' + $_.ScriptStackTrace) -replace '[\r\n]+', ' '
+            Write-Host "::error file=tests/http.tests.ps1::$detail"
+            exit 1
+          }
       - name: Windows PowerShell 5.1 port ownership tests
-        shell: cmd
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\ports.tests.ps1
+        shell: powershell
+        run: |
+          try {
+            & .\tests\ports.tests.ps1
+          } catch {
+            $detail = ($_.Exception.Message + ' stack ' + $_.ScriptStackTrace) -replace '[\r\n]+', ' '
+            Write-Host "::error file=tests/ports.tests.ps1::$detail"
+            exit 1
+          }
       - name: Windows shortcuts and API security tests
-        shell: cmd
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-integration.tests.ps1
+        shell: powershell
+        run: |
+          try {
+            & .\tests\windows-integration.tests.ps1
+          } catch {
+            $detail = ($_.Exception.Message + ' stack ' + $_.ScriptStackTrace) -replace '[\r\n]+', ' '
+            Write-Host "::error file=tests/windows-integration.tests.ps1::$detail"
+            exit 1
+          }
       - name: Shared CLI against isolated Windows backend
         shell: powershell
         run: |
           try {
             & .\tests\windows-api.tests.ps1
           } catch {
-            $detail = ($_.Exception.Message + ' at ' + $_.InvocationInfo.PositionMessage) -replace '[\r\n]+', ' '
+            $detail = ($_.Exception.Message + ' stack ' + $_.ScriptStackTrace) -replace '[\r\n]+', ' '
             Write-Host "::error file=tests/windows-api.tests.ps1::$detail"
             exit 1
           }

@@ -53,6 +53,26 @@ function Wait-TestCondition([scriptblock]$condition) {
 }
 
 try {
+    # Deterministically inject arrival between Available=0 and Poll readiness.
+    # A readable socket is not EOF if bytes became available in the meantime.
+    $script:racingBytes = [Text.Encoding]::ASCII.GetBytes("GET /race HTTP/1.1`r`nHost: localhost`r`n`r`n")
+    $racingSocket = New-Object PSObject
+    $racingSocket | Add-Member ScriptMethod Poll {
+        param($timeout, $mode)
+        $script:racingClient.Available = $script:racingBytes.Length
+        return $true
+    }
+    $script:racingClient = [pscustomobject]@{
+        Available = 0; NoDelay = $false; SendTimeout = 0; Client = $racingSocket
+        Stream = [IO.MemoryStream]::new($script:racingBytes)
+    }
+    $script:racingClient | Add-Member ScriptMethod GetStream { return $this.Stream }
+    $script:racingClient | Add-Member ScriptMethod Close { $this.Stream.Dispose() }
+    $racingConnection = New-HttpConnection $script:racingClient
+    try {
+        Assert-Http ((Receive-HttpConnection $racingConnection) -eq 'Ready') 'Available与Poll之间到达的数据不会被误判为断开'
+        Assert-Http ((Read-HttpRequest $racingConnection.Buffer.ToArray()).Path -eq '/race') '竞态到达的请求保留完整内容'
+    } finally { Close-HttpConnection $racingConnection }
     $listener.Start()
     $idle = Connect-TestClient
     $partial = Connect-TestClient
