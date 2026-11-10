@@ -43,7 +43,7 @@ try{
     assert.equal(result.status,200);server=result.data.server;assert.equal(server.passwordless,false);
   });
   await test('拒绝服务器选项注入和用户注入',async()=>{
-    for(const payload of [{...server,host:'-oProxyCommand=bad'},{...server,user:'root;echo bad'},{...server,keyPath:'/Users/uangsc/.ssh/id_ed25519'}])assert.equal((await call('POST','/api/servers',payload)).status,400);
+    for(const payload of [{...server,host:'-oProxyCommand=bad'},{...server,user:'root;echo bad'},{...server,keyPath:'/Users/example/.ssh/id_ed25519'}])assert.equal((await call('POST','/api/servers',payload)).status,400);
   });
   await test('创建隧道并返回页面兼容的数据结构',async()=>{
     const result=await call('POST','/api/tunnels',{name:'测试面板',serverId:server.id,localPort:48231,remotePort:8080,openUrl:'http://127.0.0.1:48231/ui/',group:'测试'});
@@ -80,7 +80,7 @@ try{
   });
   await test('私钥和可写路径不能超出项目，拒绝失效符号链接',async()=>{
     assert.throws(()=>confined(root,'../outside'));
-    assert.throws(()=>keyPath(root,'/Users/uangsc/.ssh/id_ed25519'));
+    assert.throws(()=>keyPath(root,'/Users/example/.ssh/id_ed25519'));
     const link=path.join(root,'data/ssh/link');fs.symlinkSync(path.join(root,'missing-target'),link);
     assert.throws(()=>keyPath(root,'data/ssh/link')); // 只创建了项目内的链接，没有写入目标。
   });

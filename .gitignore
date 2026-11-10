@@ -7,6 +7,8 @@ Desktop.ini
 # Local configuration, credentials and process records (never publish)
 /ServerTunnels.json
 /ServerTunnels.json.bak
+/*backup*.json
+/exports/
 /Panel/*.json
 /Panel/*.json.*
 /Panel/logs/

@@ -19,11 +19,23 @@
     status.textContent=current.message||(current.enabled?'快捷图标已添加':'尚未添加快捷图标');
     status.title=current.path||'';
   }
-  toggle.disabled=true;
-  request().then(render).catch(error=>{status.textContent=error.message;});
+  let busy=false;
+  async function refresh() {
+    if(busy)return;
+    busy=true;toggle.disabled=true;
+    try {render(await request());}
+    catch(error) {render(current);status.textContent=error.message;}
+    finally {busy=false;}
+  }
+  refresh();
+  window.addEventListener('focus',refresh);
+  window.addEventListener('hashchange',()=>{if(location.hash==='#/settings')refresh();});
   toggle.addEventListener('change',async()=>{
+    if(busy)return;
+    busy=true;
     const enabled=toggle.checked;toggle.disabled=true;status.textContent='正在更新快捷图标…';
     try {render(await request({enabled}));}
     catch(error) {render(current);status.textContent=error.message;}
+    finally {busy=false;}
   });
 })();

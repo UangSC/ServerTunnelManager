@@ -19,7 +19,7 @@ foreach ($relative in @('Panel/Core.ps1', 'Panel/Server.ps1', 'Panel/Http.ps1', 
     [void][Management.Automation.Language.Parser]::ParseFile((Join-Path $root $relative), [ref]$fileTokens, [ref]$fileErrors)
     if ($fileErrors.Count) { throw ($relative + ': ' + ($fileErrors | Out-String)) }
 }
-foreach ($name in @('Get-RequestBody', 'Invoke-ApiRoute', 'Test-Token')) {
+foreach ($name in @('Get-RequestBody', 'Merge-ResourceUpdateInput', 'Invoke-ApiRoute', 'Test-Token')) {
     $node = $ast.Find({ param($item) $item -is [Management.Automation.Language.FunctionDefinitionAst] -and $item.Name -eq $name }, $true)
     if (-not $node) { throw ('缺少生产函数：' + $name) }
     . ([scriptblock]::Create($node.Extent.Text))
@@ -91,13 +91,41 @@ try {
     Set-ApplicationShortcut $false | Out-Null
     Assert-Windows (Test-Path -LiteralPath $plan[0].path) '移除保留其他项目同名图标'
 
-    $script:Config = [ordered]@{ settings = $default.settings; servers = @([ordered]@{ id = 's-test'; host = '192.0.2.15' }); tunnels = @([ordered]@{ id = 't-test'; serverId = 's-test'; name = 'fixture' }) }
+    $script:Config = [ordered]@{
+        settings = $default.settings
+        servers = @([ordered]@{ id = 's-test'; name = 'fixture-server'; host = '192.0.2.15'; port = 2222; user = 'fixture'; keyPath = (Join-Path $temporary 'fixture-key'); note = 'original'; color = 'ocean'; passwordless = $false; createdAt = 'fixture-created' })
+        tunnels = @([ordered]@{ id = 't-test'; serverId = 's-test'; name = 'fixture'; localHost = '127.0.0.1'; localPort = 28080; remoteHost = '127.0.0.1'; remotePort = 8080; probe = 'none'; openUrl = ''; group = 'original'; note = 'original'; autoOpen = $false; createdAt = 'fixture-created'; updatedAt = 'fixture-updated' })
+    }
     Assert-Windows ((Invoke-TestRoute GET '/api/servers').servers.Count -eq 1) 'GET服务器列表'
     Assert-Windows ((Invoke-TestRoute GET '/api/servers/s-test').server.id -eq 's-test') 'GET单个服务器'
     Assert-Windows ((Invoke-TestRoute GET '/api/tunnels').tunnels.Count -eq 1) 'GET隧道列表'
     Assert-Windows ((Invoke-TestRoute GET '/api/tunnels/t-test').tunnel.id -eq 't-test') 'GET单个隧道'
     Assert-Rejected { Invoke-TestRoute GET '/api/servers/missing' } 'GET不存在服务器拒绝'
     Assert-Rejected { Invoke-TestRoute GET '/api/tunnels/missing' } 'GET不存在隧道拒绝'
+    # Exercise the real Core validators/update functions with only persistence
+    # mocked. These requests deliberately omit required connection fields.
+    $script:saveCount = 0
+    function Save-Config { $script:saveCount++ }
+    $updatedServer = (Invoke-TestRoute PATCH '/api/servers/s-test' '{"note":"partial-note"}').server
+    Assert-Windows ($updatedServer.note -eq 'partial-note' -and $updatedServer.host -eq '192.0.2.15' -and $updatedServer.port -eq 2222 -and $updatedServer.user -eq 'fixture' -and -not $updatedServer.passwordless) '服务器PATCH备注保留完整连接与认证字段'
+    $putServer = (Invoke-TestRoute PUT '/api/servers/s-test' '{"name":"renamed-server"}').server
+    Assert-Windows ($putServer.name -eq 'renamed-server' -and $putServer.note -eq 'partial-note' -and $putServer.id -eq 's-test' -and $putServer.createdAt -eq 'fixture-created') '服务器PUT局部更新保留ID与创建时间'
+    $updatedTunnel = (Invoke-TestRoute PATCH '/api/tunnels/t-test' '{"group":"partial-group"}').tunnel
+    Assert-Windows ($updatedTunnel.group -eq 'partial-group' -and $updatedTunnel.serverId -eq 's-test' -and $updatedTunnel.localPort -eq 28080 -and $updatedTunnel.remotePort -eq 8080 -and $updatedTunnel.probe -eq 'none' -and -not $updatedTunnel.autoOpen) '隧道PATCH分组保留服务器端口与自动开启偏好'
+    $putTunnel = (Invoke-TestRoute PUT '/api/tunnels/t-test' '{"note":"partial-tunnel-note"}').tunnel
+    Assert-Windows ($putTunnel.note -eq 'partial-tunnel-note' -and $putTunnel.group -eq 'partial-group' -and $putTunnel.id -eq 't-test') '隧道PUT局部更新保留其它字段'
+    $successfulSaves = $script:saveCount
+    Assert-Rejected { Invoke-TestRoute PATCH '/api/servers/s-test' '{"host":""}' } '服务器PATCH显式无效地址仍由原校验拒绝'
+    Assert-Rejected { Invoke-TestRoute PATCH '/api/tunnels/t-test' '{"localPort":0}' } '隧道PATCH显式无效端口仍由原校验拒绝'
+    Assert-Rejected { Invoke-TestRoute PATCH '/api/servers/s-test' '[]' } 'PATCH不接受非对象JSON'
+    Assert-Rejected { Invoke-TestRoute PUT '/api/tunnels/missing' '{"note":"ignored"}' } 'PUT不存在对象拒绝'
+    Assert-Windows ($script:saveCount -eq $successfulSaves -and $script:Config.servers[0].host -eq '192.0.2.15' -and $script:Config.tunnels[0].localPort -eq 28080) '校验失败发生在持久化及修改原配置之前'
+    $emptyBatch = Invoke-TestRoute POST '/api/batch' '{"action":"delete","ids":[]}'
+    Assert-Windows ($emptyBatch.ok -and $emptyBatch.results.Count -eq 0 -and $script:Config.tunnels.Count -eq 1 -and $script:saveCount -eq $successfulSaves) '空ids批量删除是安全no-op且保留所有条目'
+    Assert-Rejected { Invoke-TestRoute POST '/api/batch' '{"action":"delete"}' } '批量操作缺少ids拒绝而非回退全部'
+    Assert-Rejected { Invoke-TestRoute POST '/api/batch' '{"action":"delete","ids":"t-test"}' } '批量操作字符串ids拒绝'
+    Assert-Windows ($script:Config.tunnels.Count -eq 1) '无效批量选择不会修改配置'
+    function Save-Config { throw '此测试不允许持久化用户配置。' }
     Assert-Windows ((Invoke-TestRoute GET '/api/settings').applicationShortcut.supported) 'GET设置包含系统快捷图标状态'
     Assert-Rejected { Invoke-TestRoute POST '/api/application-shortcut' '{"enabled":"false"}' } '快捷图标API不接受布尔字符串'
     Assert-Rejected { Invoke-TestRoute POST '/api/application-shortcut' '{}' } '快捷图标API拒绝缺少enabled'

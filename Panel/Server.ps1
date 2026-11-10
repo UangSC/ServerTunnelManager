@@ -428,6 +428,18 @@ function Open-PanelUrl([string]$url) {
 #  API routing
 # ------------------------------------------------------------
 
+function Merge-ResourceUpdateInput($current, $body) {
+    if ($null -eq $body -or $body -isnot [System.Collections.IDictionary]) {
+        throw '更新数据必须是 JSON 对象。'
+    }
+    # Copy config fields, not a runtime snapshot, and overlay the patch without
+    # mutating the current resource before Update-* validates the full input.
+    $merged = [ordered]@{}
+    foreach ($key in $current.Keys) { $merged[$key] = $current[$key] }
+    foreach ($key in $body.Keys) { $merged[$key] = $body[$key] }
+    return $merged
+}
+
 function Invoke-ApiRoute($request) {
     $method = $request.Method
     $path = $request.Path
@@ -484,8 +496,12 @@ function Invoke-ApiRoute($request) {
         return [ordered]@{ ok = $true; tunnel = $tunnel }
     }
     if ($path -match '^/api/tunnels/([^/]+)$' -and $method -in @('PATCH', 'PUT')) {
+        $id = $matches[1]
         $body = & $getBody
-        $tunnel = Update-Tunnel $matches[1] $body
+        $current = Get-Tunnel $id
+        if ($null -eq $current) { throw '隧道不存在或已被删除。' }
+        $merged = Merge-ResourceUpdateInput $current $body
+        $tunnel = Update-Tunnel $id $merged
         return [ordered]@{ ok = $true; tunnel = $tunnel }
     }
     if ($path -match '^/api/tunnels/([^/]+)$' -and $method -eq 'DELETE') {
@@ -517,13 +533,16 @@ function Invoke-ApiRoute($request) {
     }
     if ($method -eq 'POST' -and $path -eq '/api/batch') {
         $body = & $getBody
-        if ($null -eq $body) { throw '缺少批量操作参数。' }
+        if ($null -eq $body -or $body -isnot [System.Collections.IDictionary]) { throw '缺少批量操作参数。' }
+        if (-not $body.Contains('ids') -or
+            ($body.ids -isnot [System.Collections.IList] -and $body.ids -isnot [System.Array])) {
+            throw '批量操作必须明确提供 ids 数组。'
+        }
         $action = ([string]$body.action).ToLowerInvariant()
         if ($action -notin @('open', 'close', 'restart', 'delete')) { throw '不支持的批量操作。' }
+        # Explicit [] is a safe no-op. Only the CLI's --all resolves all IDs;
+        # an omitted/malformed raw-API selection must never target everything.
         $ids = @(As-Array $body.ids)
-        if ($ids.Count -eq 0) {
-            $ids = @(Get-Tunnels | ForEach-Object { $_.id })
-        }
         $results = @()
         foreach ($id in $ids) {
             try {
@@ -571,8 +590,12 @@ function Invoke-ApiRoute($request) {
         return [ordered]@{ ok = $true; server = $server }
     }
     if ($path -match '^/api/servers/([^/]+)$' -and $method -in @('PATCH', 'PUT')) {
+        $id = $matches[1]
         $body = & $getBody
-        $server = Update-Server $matches[1] $body
+        $current = Get-Server $id
+        if ($null -eq $current) { throw '服务器不存在或已被删除。' }
+        $merged = Merge-ResourceUpdateInput $current $body
+        $server = Update-Server $id $merged
         return [ordered]@{ ok = $true; server = $server }
     }
     if ($path -match '^/api/servers/([^/]+)$' -and $method -eq 'DELETE') {
