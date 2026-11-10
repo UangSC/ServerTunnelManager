@@ -32,3 +32,15 @@ test('同步账号和出口作为文本显示，不能注入HTML；表单只包�
   const payload=f.workbench.payload({elements:{namedItem:name=>({value:data[name]})}});
   assert.deepEqual(JSON.parse(JSON.stringify(payload)),data);
 });
+
+
+test('列表行保留开关与实时状态钩子；无页面地址也可查看连接信息，字段不可注入',()=>{
+  const f=fixture(),t={id:'t-1',name:'<img onerror=bad>',kind:'dedicated',proxyAccount:'account"<script>',localHost:'127.0.0.1',localPort:18001,remoteHost:'127.0.0.1',remotePort:18001,proxyExitIp:'203.0.113.1',proxyRoute:'vpn'};
+  const html=f.workbench.row(t,{state:{status:'occupied',error:'<script>bad</script>'},server:{host:'example.com'},statusLabel:'端口占用',icon:name=>`<svg data-icon="${name}"></svg>`});
+  assert.ok(!html.includes('<script>'));assert.ok(!html.includes('<img'));assert.ok(html.includes('&lt;script&gt;'));
+  for(const hook of ['data-role="toggle"','data-live="status"','data-live="latency"','data-live="error"','data-act="connection"','data-act="port"','data-act="copy"'])assert.ok(html.includes(hook),hook);
+  assert.ok(!html.includes('data-act="open-url"'));
+  assert.ok(html.indexOf('data-role="toggle"')>html.indexOf('wb-actions tc-actions'));
+  const active=f.workbench.row({...t,url:'http://127.0.0.1:18001/'},{state:{status:'online'},server:{host:'example.com'},statusLabel:'运行中',icon:()=>''});
+  assert.match(active,/data-role="toggle"[^>]*checked/);assert.ok(active.includes('data-act="open-url"'));
+});

@@ -24,7 +24,30 @@
       if (t.kind !== 'dedicated') return '';
       return `<div class="dedicated-summary"><span title="绑定账号">${escape(t.proxyAccount || '未绑定账号')}</span><span>${escape(t.ispId || '专用代理')}</span><span title="配置的预期出口，未实时验证">预期出口 <b>${escape(t.proxyExitIp || '未填写')}</b></span><span>${routes[t.proxyRoute] || routes.unknown}</span></div>`;
     },
-    init({newTunnel, cardClick, openDrawer}) {
+    // 列表采用独立行结构，保留原卡片结构与同一套操作/实时状态钩子。
+    listHeader(dedicated) {
+      return `<div class="wb-list-header" aria-hidden="true"><span>名称${dedicated ? ' / 账号' : ' / 服务器'}</span><span>本机入口</span><span>${dedicated ? '预期出口 / 远端入口' : '远端目标 / 服务器'}</span><span>状态 / 延迟</span><span class="wb-actions-label">操作</span></div>`;
+    },
+    row(t, {state, server, statusLabel, icon}) {
+      const dedicated = t.kind === 'dedicated';
+      const status = state.status || 'offline';
+      const active = status === 'online' || status === 'connecting' || (status === 'error' && state.pid != null);
+      const local = `${t.localHost}:${t.localPort}`, remote = `${t.remoteHost}:${t.remotePort}`;
+      const identity = dedicated ? (t.proxyAccount || '未绑定账号') : `${server.user || 'root'}@${server.host || '—'}`;
+      const route = `${t.ispId || '专用代理'} · ${routes[t.proxyRoute] || routes.unknown}`;
+      const text = (value, className = '', title = value) => `<span class="wb-truncate ${className}" title="${escape(title)}">${escape(value)}</span>`;
+      return `<article class="tunnel-card wb-list-row" data-id="${escape(t.id)}" data-kind="${dedicated ? 'dedicated' : 'standard'}" data-status="${escape(status)}" tabindex="0" aria-label="${escape(t.name)}">
+        <div class="wb-cell wb-identity"><div class="wb-name"><span class="status-dot"></span><h3 class="wb-truncate" title="${escape(t.name)}">${escape(t.name)}</h3></div>${text(identity,'wb-secondary')}</div>
+        <div class="wb-cell">${text(local,'wb-mono')}${text(dedicated ? 'HTTP 代理' : (t.group || '端口转发'),'wb-secondary')}</div>
+        <div class="wb-cell">${text(dedicated ? (t.proxyExitIp || '未填写出口') : remote,'wb-mono',dedicated ? `预期出口：${t.proxyExitIp || '未填写'}（未实时验证） · ${route}` : remote)}${text(dedicated ? remote : (server.name || server.host || '—'),'wb-secondary',`经 ${server.host || '—'} → ${remote}${dedicated ? ' · ' + route : ''}`)}</div>
+        <div class="wb-cell wb-state"><span class="status-label wb-truncate" data-live="status" data-status="${escape(status)}">${escape(statusLabel)}</span><span class="wb-secondary wb-truncate" data-live="latency">${state.latency != null ? escape(state.latency) + ' ms' : '—'}</span><span class="wb-row-error wb-truncate" data-live="error" title="${escape(state.error || '')}" ${state.error ? '' : 'hidden'}>${escape(state.error || '')}</span></div>
+        <div class="wb-cell wb-actions tc-actions">
+          <div class="wb-action-line"><label class="switch" data-act="toggle" title="${active ? '关闭隧道' : '开启隧道'}"><input type="checkbox" data-role="toggle" aria-label="${escape(t.name)}：开关" ${active ? 'checked' : ''}><span class="switch-track"><span class="switch-thumb"></span></span></label><button class="quick-btn wb-info" data-act="connection" title="查看连接信息" aria-label="连接信息">${icon('info')}连接信息</button><button class="icon-btn" data-act="logs" title="查看日志" aria-label="查看日志">${icon('terminal')}</button></div>
+          <div class="wb-action-line">${t.url ? `<button class="quick-btn accent" data-act="open-url">${icon('external')}打开</button>` : ''}<button class="quick-btn" data-act="port" title="端口诊断" aria-label="端口诊断" ${status === 'occupied' ? '' : 'hidden'}>${icon('search')}</button><button class="quick-btn" data-act="copy">${icon('copy')}${dedicated ? '代理地址' : '复制'}</button><button class="quick-btn" data-act="menu" title="编辑配置与更多操作">${icon('more')}更多</button></div>
+        </div>
+      </article>`;
+    },
+    init({newTunnel, cardClick, openDrawer, renderLayout = () => {}}) {
       for (const id of ['dedicatedOverviewGrid','dedicatedGrid']) {
         const grid = document.getElementById(id);
         grid.addEventListener('click',cardClick);
@@ -44,6 +67,7 @@
         target.dataset.layout = button.dataset.layout;
         try { localStorage.setItem('ts-layout-' + target.id, button.dataset.layout); } catch { /* 存储被禁用仍可切换 */ }
         this.renderLayout(control);
+        renderLayout();
         if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
           target.getAnimations().forEach(animation => animation.cancel());
           target.animate([{opacity:.35,transform:'translateY(6px)'},{opacity:1,transform:'translateY(0)'}],{duration:220,easing:'ease-out'});

@@ -548,23 +548,23 @@
   function renderTunnelGrid() {
     const grid = $('#tunnelGrid');
     if (!grid) return;
-    const cards = S.tunnels.filter(t => t.kind !== 'dedicated').map((t) => tunnelCard(t)).join('');
-    const dedicated = S.tunnels.filter(t => t.kind === 'dedicated').map(t => tunnelCard(t)).join('');
-    for (const id of ['dedicatedOverviewGrid', 'dedicatedGrid']) {
-      $('#' + id).innerHTML = dedicated + `<button class="tunnel-add" data-action="new-dedicated"><span class="add-circle">${icon('plus')}</span><span>新建专用隧道</span><small>账号 → 固定代理入口</small></button>`;
+    for (const id of ['tunnelGrid', 'dedicatedOverviewGrid', 'dedicatedGrid']) {
+      const target = $('#' + id);
+      const dedicated = id !== 'tunnelGrid';
+      const list = target.dataset.layout === 'list';
+      const items = S.tunnels.filter(t => (t.kind === 'dedicated') === dedicated);
+      const rows = items.map(t => tunnelCard(t, list)).join('');
+      const add = `<button class="tunnel-add" data-action="${dedicated ? 'new-dedicated' : 'new-tunnel'}" aria-label="${dedicated ? '新建专用隧道' : '新建隧道'}"><span class="add-circle">${icon('plus')}</span><span>${dedicated ? '新建专用隧道' : '新建端口映射'}</span><small>${dedicated ? '账号 → 固定代理入口' : '本机端口 → 服务器端口'}</small></button>`;
+      target.innerHTML = list ? `<div class="wb-scroll-hint">左右滑动查看完整列表</div><div class="wb-list-table">${TunnelWorkbench.listHeader(dedicated)}${rows}${add}</div>` : rows + add;
     }
-    grid.innerHTML = cards + `<button class="tunnel-add" data-action="new-tunnel" aria-label="新建隧道">
-      <span class="add-circle">${icon('plus')}</span>
-      <span>新建端口映射</span>
-      <small>本机端口 → 服务器端口</small>
-    </button>`;
     applyOverviewFilter();
   }
 
-  function tunnelCard(t) {
+  function tunnelCard(t, list = false) {
     const state = S.runtime[t.id] || {};
     const status = state.status || 'offline';
     const server = t.server || S.servers.find((x) => x.id === t.serverId) || {};
+    if (list) return TunnelWorkbench.row(t, {state, server, statusLabel: statusText(status), icon});
     const online = status === 'online';
     const active = online || status === 'connecting' || (status === 'error' && state.pid != null);
     const latency = state.latency != null ? `${state.latency} ms` : (online ? '探测中' : '—');
@@ -988,7 +988,7 @@
       const portButton = card.querySelector('[data-act="port"]');
       if (portButton) portButton.hidden = status !== 'occupied';
       if (err) {
-        if (state.error) { err.hidden = false; err.textContent = state.error; }
+        if (state.error) { err.hidden = false; err.textContent = state.error; err.title = state.error; }
         else { err.hidden = true; err.textContent = ''; }
       }
       const toggle = card.querySelector('[data-role="toggle"]');
@@ -1620,9 +1620,11 @@
   async function toggleTunnel(id, next) {
     const t = S.tunnels.find((x) => x.id === id);
     if (!t) return;
-    const card = document.querySelector(`.tunnel-card[data-id="${id}"]`);
-    const switchEl = card?.querySelector('.tc-actions .switch') || document.querySelector(`[data-row-id="${id}"] .switch`);
-    if (switchEl) switchEl.classList.add('is-busy');
+    if (S.pendingToggles?.has(id)) return;
+    S.pendingToggles ??= new Set();
+    S.pendingToggles.add(id);
+    const switches = $$(`.tunnel-card[data-id="${id}"] .switch, [data-row-id="${id}"] .switch`);
+    switches.forEach(el => el.classList.add('is-busy'));
     try {
       await api(`/api/tunnels/${encodeURIComponent(id)}/${next ? 'open' : 'close'}`, { method: 'POST' });
       if (next) toast('info', '正在开启隧道', t.name, 1800);
@@ -1632,7 +1634,7 @@
       if (next && error.message.includes('占用')) showPortDiagnosis(t);
       scheduleRefresh(100);
     } finally {
-      setTimeout(() => switchEl?.classList.remove('is-busy'), 700);
+      setTimeout(() => { S.pendingToggles.delete(id); switches.forEach(el => el.classList.remove('is-busy')); }, 700);
     }
   }
   async function restartTunnel(id) {
@@ -1744,6 +1746,14 @@
   function showTunnelConnection(t) {
     const server = t.server || S.servers.find((s) => s.id === t.serverId) || {};
     const backend = localBackendUrl(t);
+    if (t.kind === 'dedicated' || !t.url) {
+      openModal({title: '连接信息', subtitle: t.name,
+        body: `<div class="drawer-note" style="display:grid;gap:14px"><div><strong>${t.kind === 'dedicated' ? 'HTTP 代理地址' : '本机入口'}</strong><br><code>${esc(t.kind === 'dedicated' ? backend : `${t.localHost}:${t.localPort}`)}</code></div><div>SSH：${esc(server.user)}@${esc(server.host)}:${server.port || 22}<br>远端入口：${esc(t.remoteHost)}:${t.remotePort}</div>${TunnelWorkbench.summary(t)}<p>${t.kind === 'dedicated' ? '请在对应浏览器或应用中配置此代理。预期出口仅为配置记录，未实时验证。' : '请通过支持对应协议的应用连接本机入口。'}</p></div>`,
+        footer: `<button class="btn btn-primary" id="copyConnection">${icon('copy')}复制地址</button>`,
+        onMount(root) { $('#copyConnection', root).addEventListener('click', () => copyText(t.kind === 'dedicated' ? backend : `${t.localHost}:${t.localPort}`)); }
+      });
+      return;
+    }
     const mihomo = Number(t.remotePort) === 9090;
     openModal({
       title: '连接信息',
@@ -2715,7 +2725,7 @@
      Events
      ------------------------------------------------------------ */
   function bindEvents() {
-    TunnelWorkbench.init({newTunnel: openTunnelModal, cardClick: handleTunnelCardClick, openDrawer});
+    TunnelWorkbench.init({newTunnel: openTunnelModal, cardClick: handleTunnelCardClick, openDrawer, renderLayout: renderTunnelGrid});
     // Navigation
     document.addEventListener('click', (event) => {
       const nav = event.target.closest('[data-nav]');
