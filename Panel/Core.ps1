@@ -557,7 +557,7 @@ function Add-Tunnel($body) {
         updatedAt = $now
     }
     $script:Config.tunnels = @(Get-Tunnels) + @($tunnel)
-    Initialize-TunnelState $tunnel.id
+    Initialize-TunnelState $tunnel.id | Out-Null
     Save-Config
     Add-Log info 'panel' "新增隧道「$($tunnel.name)」127.0.0.1:$($tunnel.localPort) → $($tunnel.remoteHost):$($tunnel.remotePort)"
     Add-Activity -Kind 'info' -Title '新增隧道' -Detail "$($tunnel.name) · 127.0.0.1:$($tunnel.localPort)" -TunnelId $tunnel.id
@@ -630,7 +630,7 @@ function Get-ServerInput($body, [string]$existingId = '') {
         keyPath      = $keyPath
         note         = $note
         color        = $color
-        passwordless = To-Bool $body.passwordless $true
+        passwordless = To-Bool $body.passwordless $false
     }
 }
 

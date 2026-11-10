@@ -202,6 +202,7 @@ public static class WindowsApiSshSentinel {
     Assert-Api ((Invoke-TestCli -arguments @('server', 'list')).servers.Count -eq 0) '共享CLI读取初始空服务器集合'
     Assert-Api ((Invoke-TestCli -arguments @('tunnel', 'list')).tunnels.Count -eq 0) '共享CLI读取初始空隧道集合'
     $server = (Invoke-TestCli -arguments @('server', 'add', '--name', '隔离示例', '--host', '192.0.2.15', '--user', 'fixture', '--key-path', $keyFixture)).server
+    Assert-Api (-not $server.passwordless) '新增服务器配置不伪报SSH免密验证成功'
     Assert-Api ((Invoke-TestCli -arguments @('server', 'get', $server.id)).server.name -eq '隔离示例') '共享CLI添加并读取Unicode服务器'
     Invoke-TestCli -arguments @('server', 'update', $server.id, '--note', '仅临时演示') | Out-Null
     Assert-Api ((Invoke-TestCli -arguments @('server', 'get', $server.id)).server.note -eq '仅临时演示') '共享CLI更新服务器'

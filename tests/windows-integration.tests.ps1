@@ -114,6 +114,10 @@ try {
     Assert-Windows ($updatedTunnel.group -eq 'partial-group' -and $updatedTunnel.serverId -eq 's-test' -and $updatedTunnel.localPort -eq 28080 -and $updatedTunnel.remotePort -eq 8080 -and $updatedTunnel.probe -eq 'none' -and -not $updatedTunnel.autoOpen) '隧道PATCH分组保留服务器端口与自动开启偏好'
     $putTunnel = (Invoke-TestRoute PUT '/api/tunnels/t-test' '{"note":"partial-tunnel-note"}').tunnel
     Assert-Windows ($putTunnel.note -eq 'partial-tunnel-note' -and $putTunnel.group -eq 'partial-group' -and $putTunnel.id -eq 't-test') '隧道PUT局部更新保留其它字段'
+    $created = (Invoke-TestRoute POST '/api/tunnels' '{"name":"added-fixture","serverId":"s-test","localPort":28081,"remotePort":8081,"probe":"none","autoOpen":false}').tunnel
+    Assert-Windows ($created -is [System.Collections.IDictionary] -and [string]$created.id -match '^t-[a-f0-9]+$') '新增隧道API仅返回单个配置对象，不夹带运行状态'
+    Invoke-TestRoute DELETE ('/api/tunnels/' + $created.id) | Out-Null
+    Assert-Windows ($script:Config.tunnels.Count -eq 1) '新增隧道对象ID可直接用于后续API删除'
     $successfulSaves = $script:saveCount
     Assert-Rejected { Invoke-TestRoute PATCH '/api/servers/s-test' '{"host":""}' } '服务器PATCH显式无效地址仍由原校验拒绝'
     Assert-Rejected { Invoke-TestRoute PATCH '/api/tunnels/t-test' '{"localPort":0}' } '隧道PATCH显式无效端口仍由原校验拒绝'
