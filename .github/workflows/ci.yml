@@ -10,8 +10,8 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '24'
       - name: Check shared assets and publishable source
@@ -24,8 +24,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '24'
       - name: Check shared assets and publishable source
@@ -45,5 +45,12 @@ jobs:
         shell: cmd
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-integration.tests.ps1
       - name: Shared CLI against isolated Windows backend
-        shell: cmd
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-api.tests.ps1
+        shell: powershell
+        run: |
+          try {
+            & .\tests\windows-api.tests.ps1
+          } catch {
+            $detail = ($_.Exception.Message + ' at ' + $_.InvocationInfo.PositionMessage) -replace '[\r\n]+', ' '
+            Write-Host "::error file=tests/windows-api.tests.ps1::$detail"
+            exit 1
+          }
