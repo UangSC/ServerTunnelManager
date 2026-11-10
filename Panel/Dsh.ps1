@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 # Refresh a configured DSH tunnel's process-level login link on demand.
 # Match the requested local URL to one configured tunnel; never assume a
 # personal tunnel id, SSH host or account, and never persist the login token.
@@ -27,7 +27,7 @@ function Resolve-DshPanelUrl([string]$url) {
     $arguments += @("$($server.user)@$($server.host)", "sudo -n journalctl -u deepseek-bot.service -g '^dsh web:' -n 1 --no-pager -o cat")
     $info = New-Object System.Diagnostics.ProcessStartInfo
     $info.FileName = Get-SshPath
-    # Windows PowerShell 5.1 也支持此路径；此处参数仅来自已校验的本机配置与固定命令。
+    # 参数仅来自已校验的本机配置与固定命令。
     $info.Arguments = ($arguments | ForEach-Object { '"' + ([string]$_).Replace('"', '\"') + '"' }) -join ' '
     $info.UseShellExecute = $false
     $info.CreateNoWindow = $true

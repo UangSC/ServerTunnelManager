@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 <#
 No-Node Windows API automation. Examples:
   .\bin\api.ps1 -Path /api/settings

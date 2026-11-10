@@ -4,7 +4,7 @@ Windows / macOS 本地 SSH 端口转发控制台。支持网页、**JSON API** �
 
 - 默认地址：`http://127.0.0.1:9666/`，只监听回环地址，不要暴露到公网或局域网。
 - 全新安装为空列表、默认**演示模式**，不连接任何预设服务器。
-- Windows：Windows PowerShell 5.1 / OpenSSH；macOS：Node.js 22+ / 系统 OpenSSH。没有 npm 依赖。
+- Windows：PowerShell 7.x / OpenSSH；macOS：Node.js 22+ / 系统 OpenSSH。没有 npm 依赖。
 - Windows/macOS 共用 CLI、同步模块、样式和新增设置组件；系统进程、密钥权限和应用集成分别实现，结构清晰优先，不强行统一复杂平台代码。
 
 ## 1. 获取与更新
@@ -158,7 +158,7 @@ node bin/tunnel.mjs import --file local-backup.json --yes
 node bin/tunnel.mjs reset --yes
 ```
 
-在 Windows PowerShell 5.1 中，建议使用 `--file` 或 `--file -` 避免原生命令引号差异。`--json` / `--file` / 命名字段三种输入不可混用。命名字段使用 kebab-case：`--server-id` 对应 `serverId`；布尔值必须是 `true`/`false`，端口等数字必须是整数。
+使用 PowerShell 7.x；包含较复杂 JSON 时建议使用 `--file` 或 `--file -` 避免原生命令引号差异。`--json` / `--file` / 命名字段三种输入不可混用。命名字段使用 kebab-case：`--server-id` 对应 `serverId`；布尔值必须是 `true`/`false`，端口等数字必须是整数。
 
 - 删除、批量删除、导入和重置要求显式 `--yes`；普通新增和编辑不需要交互确认。
 - 输出是 stdout 上的 JSON，错误写 stderr，失败退出码为非零，批量部分失败也返回非零；`--help` 输出文本。
@@ -289,10 +289,10 @@ node scripts/audit-repository.mjs          # 审查 Git 暂存文件，不读未
 Windows 回归通过系统 PowerShell 执行，**不要传 LiveSsh**：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\http.tests.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\ports.tests.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-integration.tests.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-api.tests.ps1
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests\http.tests.ps1
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests\ports.tests.ps1
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-integration.tests.ps1
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-api.tests.ps1
 ```
 
 [CI](<.github/workflows/ci.yml>) 会运行 macOS 测试、共享资源一致性检查及真实 Windows PowerShell 回归。本次 Mac 本机测试不连接生产服务器；本机没有 Windows PowerShell，Windows 执行结果以 CI/Windows 机器为准，不能把静态检查当作实机通过。
@@ -302,3 +302,25 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-api.tests.
 ---
 
 Tunnel Studio 1.4.0 · 一个仓库、两平台、可自动化的本地控制台。
+
+
+## 专用隧道与总览布局（1.5）
+
+总览的普通隧道下方新增“专用隧道”区域，左侧工作台也有独立入口。两类映射共用已有 SSH 生命周期、端口冲突检查、日志、编辑和自动重连。卡片／列表切换带 220ms 渐显位移动画，遵循系统减少动态效果设置；三个区域分别记住当前设备的布局选择。
+
+新建或编辑映射时选择“专用隧道”，填写绑定账号、ISP 标识、预期出口 IP 和服务器路由备注。代理的远端目标通常是 SSH 服务器的回环地址与专用 HTTP 代理端口。本机只做 SSH 转发；ISP 用户名密码仍由服务器管理。卡片的“代理地址”复制 `http://127.0.0.1:<本机端口>`，浏览器或应用需要单独使用这个代理。此功能不修改系统代理和浏览器配置，也不在本机保存 ISP 认证。
+
+预期出口和路由为配置备注，不会改变服务器路由；TCP 探测成功仅代表监听可达，不代表已经验证实际出口 IP。
+
+共享 CLI 示例（文档地址）：
+
+```sh
+node bin/tunnel.mjs tunnel add --name "Account proxy" --server-id srv-ID --local-port 18001 --remote-host 127.0.0.1 --remote-port 18001 --probe tcp --kind dedicated --proxy-account example --isp-id ISP-01 --proxy-exit-ip 203.0.113.10 --proxy-route direct
+```
+
+两端 API 的新增字段为 `kind`（`standard` / `dedicated`）、`proxyAccount`、`ispId`、`proxyExitIp`、`proxyRoute`（`unknown` / `direct` / `vpn`）。创建、部分更新、导入导出和同步均保留这些字段。旧配置缺少类型时视为普通隧道。Windows 无 Node 的 `bin/api.cmd` 仍可通过 JSON 请求体使用相同 API。
+
+跨设备同步包含类型、账号、预期出口、路由备注及转发映射；已有映射保留各设备自己的监听端口、私钥路径及自动开启偏好，新映射默认不自动开启。布局偏好、浏览器目录和 ISP 密码不进入同步包。**两端均应更新到 1.5 或更高版本再发布同步**，旧版客户端不认识新增字段，可能在重新发布时丢失它们。代码更新不会自动从另一台设备复制私人配置：先在配置完整的设备发布同步，再在另一端预览并应用。
+
+
+Windows 1.5 起要求 PowerShell 7.x（`pwsh.exe` 在 PATH 中）。直接运行旧的 Windows PowerShell 会被脚本版本要求拒绝。已有同项目快捷图标可在设置中重新启用以升级目标程序；系统自启包装和 `.cmd` 入口也使用 7.x。根目录的兼容入口继续保留，内部实现按平台和共享模块分目录维护。

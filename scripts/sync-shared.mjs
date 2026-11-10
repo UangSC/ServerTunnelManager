@@ -3,6 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const pairs=[
+  ['shared/tunnel-workbench.js','Panel/web/assets/tunnel-workbench.js'],
+  ['shared/tunnel-workbench.js','portable/TunnelStudio/web/assets/tunnel-workbench.js'],
   ['shared/sync.mjs','portable/TunnelStudio/server/sync.mjs'],
   ['shared/sync-ui.js','Panel/web/assets/sync-ui.js'],
   ['shared/sync-ui.js','portable/TunnelStudio/web/assets/sync-ui.js'],

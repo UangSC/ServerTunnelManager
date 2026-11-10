@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 # Offline shortcut CLI: no panel launch, Node, SSH, or user config writes.
 [CmdletBinding()]
 param([ValidateSet('status', 'install', 'remove')][string]$Action = 'status')

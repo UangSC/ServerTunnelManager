@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 <#
     Tunnel Studio · stop the local panel service.
     Verifies the process command line before terminating it. SSH tunnels that

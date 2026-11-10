@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { Panel,ROOT,defaults,confined,keyPath,validateConfig,commandBundle,sshArgs } from '../server/app.mjs';
 const root=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'tunnel-studio-app-'));
 fs.mkdirSync(path.join(root,'web/assets'),{recursive:true});
-for(const file of ['index.html','assets/app.js','assets/app.css','assets/favicon.svg','assets/sync-ui.js','assets/application-shortcut-ui.js'])fs.copyFileSync(path.join(ROOT,'web',file),path.join(root,'web',file));
+for(const file of ['index.html','assets/app.js','assets/app.css','assets/favicon.svg','assets/sync-ui.js','assets/application-shortcut-ui.js','assets/tunnel-workbench.js'])fs.copyFileSync(path.join(ROOT,'web',file),path.join(root,'web',file));
 const panel=await new Panel(root,{config:defaults()}).listen(0);
 const base=`http://127.0.0.1:${panel.port}`;
 const call=async(method,url,body)=>{
@@ -21,7 +21,7 @@ let server,tunnel;
 try{
   await test('页面与所有静态资源可加载，HTML 注入令牌',async()=>{
     const html=await(await fetch(base+'/')).text();assert.ok(html.includes(panel.token));assert.ok(!html.includes('__PANEL_TOKEN__'));
-    for(const file of ['app.js','app.css','favicon.svg','sync-ui.js','application-shortcut-ui.js'])assert.equal((await fetch(base+'/assets/'+file)).status,200);
+    for(const file of ['app.js','app.css','favicon.svg','sync-ui.js','application-shortcut-ui.js','tunnel-workbench.js'])assert.equal((await fetch(base+'/assets/'+file)).status,200);
   });
   await test('未携带令牌不能调用 API',async()=>assert.equal((await fetch(base+'/api/bootstrap')).status,401));
   await test('拒绝伪造 Host',async()=>assert.equal(await raw('/api/health',{Host:'evil.example'}),403));

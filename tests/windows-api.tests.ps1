@@ -1,6 +1,6 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 <#
-Windows end-to-end API/CLI test. Run with powershell.exe, not against a user's
+Windows end-to-end API/CLI test. Run with pwsh.exe, not against a user's
 checkout: an explicit source-only whitelist is copied into a unique temp root.
 The only configuration is newly-created, empty and simulation=true. A compiled
 no-network ssh.exe sentinel is first on the server's PATH as an extra safeguard.
@@ -9,10 +9,10 @@ is only queried; no desktop links or startup entries are installed/removed.
 All child processes and temporary files are cleaned up.
 #>
 $ErrorActionPreference = 'Stop'
-if ($env:OS -ne 'Windows_NT') { throw '此端到端测试需要 Windows PowerShell 5.1。' }
+if ($env:OS -ne 'Windows_NT') { throw '此端到端测试需要 PowerShell 7.x。' }
 $sourceRoot = Split-Path -Parent $PSScriptRoot
 $node = Get-Command node.exe -ErrorAction Stop
-$powerShell = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$powerShell = Join-Path $PSHOME 'pwsh.exe'
 $temporary = [IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetTempPath()) ('tunnel-studio-api-tests-' + [guid]::NewGuid().ToString('N'))))
 $testRoot = Join-Path $temporary 'project with spaces'
 $panelDir = Join-Path $testRoot 'Panel'
@@ -36,17 +36,10 @@ function Get-FreeLoopbackPort {
     try { $listener.Start(); return [int]$listener.LocalEndpoint.Port }
     finally { $listener.Stop() }
 }
-function Quote-TestArgument([string]$value) {
-    # Windows CommandLineToArgvW quoting, compatible with ProcessStartInfo on
-    # .NET Framework / PS5.1 (which has no modern ArgumentList collection).
-    $quoted = [regex]::Replace($value, '(\\*)"', '$1$1\"')
-    $quoted = [regex]::Replace($quoted, '(\\+)$', '$1$1')
-    return '"' + $quoted + '"'
-}
 function Invoke-TestProcess([string]$file, [string[]]$arguments) {
     $start = New-Object Diagnostics.ProcessStartInfo
     $start.FileName = $file
-    $start.Arguments = ($arguments | ForEach-Object { Quote-TestArgument $_ }) -join ' '
+    foreach ($argument in $arguments) { $start.ArgumentList.Add($argument) }
     $start.WorkingDirectory = $testRoot
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
@@ -137,7 +130,13 @@ public static class WindowsApiSshSentinel {
     }
 }
 '@
-    Add-Type -TypeDefinition $sentinelSource -OutputAssembly (Join-Path $guardDir 'ssh.exe') -OutputType ConsoleApplication
+    # Build a no-network sentinel with the Windows C# compiler; Add-Type on
+    # .NET does not emit console executables. Production still uses pwsh only.
+    $sentinelFile = Join-Path $guardDir 'sentinel.cs'
+    [IO.File]::WriteAllText($sentinelFile, $sentinelSource, $utf8)
+    $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
+    & $compiler /nologo /target:exe ('/out:' + (Join-Path $guardDir 'ssh.exe')) $sentinelFile
+    if ($LASTEXITCODE -ne 0) { throw '无网络 SSH 测试桩编译失败。' }
     $port = Get-FreeLoopbackPort
     $keyFixture = Join-Path $temporary 'not-a-real-key'
     $configPath = Join-Path $panelDir 'config.json'
@@ -157,7 +156,7 @@ public static class WindowsApiSshSentinel {
     Assert-Api ($beforeLaunch.settings.simulation -eq $true -and -not $beforeLaunch.settings.autoOpenOnLaunch -and $beforeLaunch.servers.Count -eq 0 -and $beforeLaunch.tunnels.Count -eq 0) '启动前确认全新空配置且仅演示模式'
     $start = New-Object Diagnostics.ProcessStartInfo
     $start.FileName = $powerShell
-    $start.Arguments = (@('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $serverPath, '-Port', [string]$port) | ForEach-Object { Quote-TestArgument $_ }) -join ' '
+    foreach ($argument in @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $serverPath, '-Port', [string]$port)) { $start.ArgumentList.Add($argument) }
     $start.WorkingDirectory = $testRoot
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
@@ -197,7 +196,7 @@ public static class WindowsApiSshSentinel {
     try { Invoke-PanelHttpRequest ([uri]($base + '/api/settings')) | Out-Null }
     catch { $unauthenticatedRejected = $_.Exception.Message -like 'HTTP 401*' }
     Assert-Api $unauthenticatedRejected '实际Windows API拒绝缺少X-Panel-Token的请求'
-    Assert-Api ($health.version -eq '1.4.0') '实际Windows健康接口版本1.4.0'
+    Assert-Api ($health.version -eq '1.5.0') '实际Windows健康接口版本1.5.0'
     Assert-Api ((Invoke-TestCli -arguments @('status')).simulation) '共享Node CLI识别Windows健康接口并读取演示状态'
     Assert-Api ((Invoke-TestCli -arguments @('server', 'list')).servers.Count -eq 0) '共享CLI读取初始空服务器集合'
     Assert-Api ((Invoke-TestCli -arguments @('tunnel', 'list')).tunnels.Count -eq 0) '共享CLI读取初始空隧道集合'
@@ -208,7 +207,7 @@ public static class WindowsApiSshSentinel {
     Assert-Api ((Invoke-TestCli -arguments @('server', 'get', $server.id)).server.note -eq '仅临时演示') '共享CLI更新服务器'
     $localPort = Get-FreeLoopbackPort
     while ($localPort -eq $port) { $localPort = Get-FreeLoopbackPort }
-    $tunnel = (Invoke-TestCli -arguments @('tunnel', 'add', '--name', '临时一', '--server-id', $server.id, '--local-port', [string]$localPort, '--remote-port', '8080', '--probe', 'none', '--auto-open', 'false')).tunnel
+    $tunnel = (Invoke-TestCli -arguments @('tunnel', 'add', '--name', '临时一', '--server-id', $server.id, '--local-port', [string]$localPort, '--remote-port', '8080', '--probe', 'none', '--auto-open', 'false', '--kind', 'dedicated', '--proxy-account', 'example', '--isp-id', 'ISP-01', '--proxy-exit-ip', '203.0.113.10', '--proxy-route', 'direct')).tunnel
     $otherPort = Get-FreeLoopbackPort
     while ($otherPort -in @($port, $localPort)) { $otherPort = Get-FreeLoopbackPort }
     $other = (Invoke-TestCli -arguments @('tunnel', 'add', '--name', '临时二', '--server-id', $server.id, '--local-port', [string]$otherPort, '--remote-port', '8081', '--probe', 'none', '--auto-open', 'false')).tunnel
@@ -217,6 +216,11 @@ public static class WindowsApiSshSentinel {
     Invoke-TestCli -arguments @('tunnel', 'update', $tunnel.id, '--group', '临时测试') | Out-Null
     Assert-Api ((Invoke-TestCli -arguments @('tunnel', 'get', $tunnel.id)).tunnel.group -eq '临时测试') '共享CLI更新映射'
     Invoke-TestCli -arguments @('settings', 'set', '--theme', 'light', '--simulation', 'true', '--auto-open-on-launch', 'false', '--latency-probe', 'false') | Out-Null
+    $dedicated = (Invoke-TestCli -arguments @('tunnel', 'get', $tunnel.id)).tunnel
+    Assert-Api ($dedicated.kind -eq 'dedicated' -and $dedicated.proxyAccount -eq 'example' -and $dedicated.ispId -eq 'ISP-01' -and $dedicated.proxyExitIp -eq '203.0.113.10' -and $dedicated.proxyRoute -eq 'direct') '专用隧道元数据经CLI创建和部分更新保持完整'
+    Invoke-TestCli -arguments @('tunnel', 'update', $tunnel.id, '--kind', 'invalid') -ExpectFailure | Out-Null
+    Invoke-TestCli -arguments @('tunnel', 'update', $tunnel.id, '--proxy-exit-ip', 'invalid') -ExpectFailure | Out-Null
+    Invoke-TestCli -arguments @('tunnel', 'update', $tunnel.id, '--proxy-route', 'invalid') -ExpectFailure | Out-Null
     $settings = Invoke-TestCli -arguments @('settings', 'get')
     Assert-Api ($settings.settings.theme -eq 'light' -and $settings.settings.simulation -and -not $settings.settings.autoOpenOnLaunch -and $settings.applicationShortcut.supported) '共享CLI设置读取含系统快捷图标状态且不离开演示模式'
     Assert-Api ($null -eq (Invoke-TestCli -arguments @('api', 'GET', '/api/bootstrap')).PSObject.Properties['token']) '共享CLI不输出Windows bootstrap token'
@@ -244,6 +248,7 @@ public static class WindowsApiSshSentinel {
     $backedUp = ConvertFrom-Json -InputObject ([IO.File]::ReadAllText($backup, [Text.Encoding]::UTF8))
     Assert-Api ($backedUp.settings.simulation -and $backedUp.settings.theme -eq 'light' -and $backedUp.tunnels.Count -eq 2) '导入备份保留替换前完整配置而非覆盖后数据'
     $after = Invoke-TestCli -arguments @('api', 'GET', '/api/export')
+    Assert-Api ($after.tunnels[0].kind -eq 'dedicated' -and $after.tunnels[0].proxyExitIp -eq '203.0.113.10') '导入归一化保留专用隧道配置'
     Assert-Api ($after.settings.simulation -and -not $after.settings.autoOpenOnLaunch -and @($after.tunnels | Where-Object { $_.autoOpen }).Count -eq 0 -and @($after.servers | Where-Object { $_.passwordless }).Count -eq 0) '导入强制演示且关闭自动开启和密码免登偏好'
     Assert-Api (-not (Test-Path -LiteralPath $sshMarker)) '恶意导入偏好仍不调用任何SSH进程'
     $raw = Invoke-TestProcess $powerShell @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $testRoot 'bin/api.ps1'), '-Path', '/api/settings', '-Port', [string]$port)

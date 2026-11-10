@@ -11,7 +11,7 @@
 - Windows 后端：[Panel](<Panel/Server.ps1>)；macOS 后端：[portable 实现](<portable/TunnelStudio/server/app.mjs>)。
 - 两平台共享 CLI：[客户端](<portable/TunnelStudio/bin/tunnel.mjs>)；Windows 无 Node 的原始 API 包装：[客户端](<Panel/ApiClient.ps1>)。
 - 共享模块和样式以 [shared](<shared/sync.mjs>) 中的文件为权威来源，修改后执行 `node scripts/sync-shared.mjs --write`，再执行无参数检查。平台主 UI 保留单独实现；同步新的业务交互，不能把另一平台的能力限制硬编码覆盖过去。
-- Windows PowerShell 兼容 5.1；源文件使用 UTF-8 BOM。编辑工具可能去掉 BOM，发布前再次检查，禁止使用仅 PowerShell 7 支持的语法。
+- Windows 仅支持 PowerShell 7.x，入口统一使用 pwsh.exe；不维护 Windows PowerShell 5.x 兼容分支。源文件使用 UTF-8（现有 BOM 可保留），新增进程参数使用 ProcessStartInfo.ArgumentList，测试和 CI 同样使用 pwsh。
 - API 保持相同端点、核心字段和 JSON 输入类型；系统状态不写入跨设备配置。修改后更新 [README](<README.md>) 并增加两侧契约测试。
 
 ## 自动化操作

@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 # Loopback-only API client primitives shared by the Windows no-Node CLI.
 # Tokens are obtained from the running panel HTML and remain in memory only.
 

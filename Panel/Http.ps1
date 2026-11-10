@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 # Buffer each connection independently. Browser preconnects and partial requests
 # must not block other requests or the tunnel maintenance loop.
 

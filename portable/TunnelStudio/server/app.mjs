@@ -13,7 +13,7 @@ import { ApplicationShortcuts } from './shortcuts.mjs';
 import { probeTunnel, effectiveProbe } from './probe.mjs';
 const execute = promisify(execFile);
 export const ROOT = fs.realpathSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..'));
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 const platformName = process.platform === 'darwin' ? 'macOS' : 'Linux';
 const openCommand = process.platform === 'darwin' ? '/usr/bin/open' : 'xdg-open';
 const now = () => new Date().toISOString();
@@ -71,7 +71,11 @@ function tunnelInput(root,input,config,existingId=''){
   if(localPort===config.settings.panelPort)fail('不能使用面板自身端口。');
   if(config.tunnels.some(t=>t.id!==existingId&&t.localPort===localPort))fail('本机端口已被其他隧道使用。');
   if(!config.servers.some(s=>s.id===input.serverId))fail('请选择有效服务器。');
-  return {name:text(input.name,'隧道名称',60),serverId:input.serverId,localHost,localPort,remoteHost:host(input.remoteHost||'127.0.0.1'),
+  if(input.kind !== undefined && !['standard','dedicated'].includes(input.kind))fail('隧道类型无效。');
+  if(input.proxyRoute !== undefined && !['unknown','direct','vpn'].includes(input.proxyRoute))fail('代理路由无效。');
+  const proxyExitIp=text(input.proxyExitIp??'','出口 IP',45,true);
+  if(proxyExitIp && !net.isIP(proxyExitIp))fail('出口 IP 格式无效。');
+  return {kind:input.kind||'standard',proxyAccount:text(input.proxyAccount??'','绑定账号',100,true),ispId:text(input.ispId??'','ISP 标识',32,true),proxyExitIp,proxyRoute:input.proxyRoute||'unknown',name:text(input.name,'隧道名称',60),serverId:input.serverId,localHost,localPort,remoteHost:host(input.remoteHost||'127.0.0.1'),
     remotePort:integer(input.remotePort,'远端端口'),probe:['auto','http','tcp','socks5','none'].includes(input.probe)?input.probe:'tcp',
     openUrl:httpUrl(input.openUrl),group:text(input.group||'','分组',24,true),note:text(input.note||'','备注',200,true),autoOpen:input.autoOpen===undefined?false:flag(input.autoOpen,'自动开启')};
 }
@@ -371,7 +375,7 @@ export class Panel{
           const operation=(this.queue||Promise.resolve()).then(()=>this.api(req.method,pathname,parsed.searchParams,body));this.queue=operation.catch(()=>{});return send(200,await operation);
         }
         if(!['GET','HEAD'].includes(req.method))return send(405,{ok:false,error:'请求方法不支持。'});
-        const files={'/':'index.html','/index.html':'index.html','/assets/app.js':'assets/app.js','/assets/application-shortcut-ui.js':'assets/application-shortcut-ui.js','/assets/sync-ui.js':'assets/sync-ui.js','/assets/app.css':'assets/app.css','/assets/favicon.svg':'assets/favicon.svg','/preview.png':'preview.png'};
+        const files={'/assets/tunnel-workbench.js':'assets/tunnel-workbench.js','/':'index.html','/index.html':'index.html','/assets/app.js':'assets/app.js','/assets/application-shortcut-ui.js':'assets/application-shortcut-ui.js','/assets/sync-ui.js':'assets/sync-ui.js','/assets/app.css':'assets/app.css','/assets/favicon.svg':'assets/favicon.svg','/preview.png':'preview.png'};
         if(!Object.hasOwn(files,pathname))return send(404,{ok:false,error:'文件不存在。'});
         const target=confined(this.root,'web/'+files[pathname]),ext=path.extname(target),types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png'};
         let data=fs.readFileSync(target);if(ext==='.html')data=Buffer.from(data.toString('utf8').replaceAll('__PANEL_TOKEN__',this.token).replaceAll('__APP_VERSION__',VERSION));send(200,data,types[ext]);

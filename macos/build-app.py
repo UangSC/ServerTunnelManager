@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 
 PROJECT = Path(__file__).resolve().parent.parent
-VERSION = '1.4.0'
+VERSION = '1.5.0'
 # Official Node.js LTS archive and its published SHA-256. Pin both for reproducible builds.
 NODE = '24.22.2'
 HASHES = {

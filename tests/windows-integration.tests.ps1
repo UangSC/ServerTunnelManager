@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 # Hermetic tests: temporary directories, fake WScript COM, mocked API traffic.
 # Never start the server, read live config/key material, or create real links.
 $ErrorActionPreference = 'Stop'
@@ -11,8 +11,8 @@ $tokens = $null
 $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseFile((Join-Path $root 'Panel/Server.ps1'), [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw ($errors | Out-String) }
-# Running this test under Windows PowerShell 5.1 also validates all production
-# Windows entry points with the actual 5.1 parser, not only the mocked behavior.
+# Running this test under PowerShell 7.x also validates all production
+# Windows entry points with the actual 7.x parser, not only the mocked behavior.
 foreach ($relative in @('Panel/Core.ps1', 'Panel/Server.ps1', 'Panel/Http.ps1', 'Panel/Shortcuts.ps1', 'Panel/ApiClient.ps1', 'Panel/Dsh.ps1', 'Panel/Extras.ps1', 'Panel/Ports.ps1', 'Panel/Sync.ps1', 'Start-Panel.ps1', 'Stop-Panel.ps1', 'ServerTunnelManager.ps1', 'bin/api.ps1', 'bin/shortcuts.ps1')) {
     $fileTokens = $null
     $fileErrors = $null
@@ -77,11 +77,14 @@ try {
     Assert-Windows ($initial.supported -and -not $initial.enabled -and $initial.paths.Count -eq 4) '查询产生四个计划但不写快捷图标'
     $plan = @(Get-PanelShortcutSpecifications)
     Assert-Windows ($plan[0].arguments.Contains('"' + (Join-Path $script:RootDir 'Start-Panel.ps1') + '"')) '包含空格的脚本路径正确双引号引用'
-    Assert-Windows ($plan[1].arguments.Contains('Stop-Panel.ps1') -and $plan[1].target.EndsWith('powershell.exe')) '停止图标调用 PowerShell 脚本、不需要 Node'
+    Assert-Windows ($plan[1].arguments.Contains('Stop-Panel.ps1') -and $plan[1].target.EndsWith('pwsh.exe')) '停止图标调用 PowerShell 脚本、不需要 Node'
     $installed = Set-ApplicationShortcut $true
     Assert-Windows ($installed.enabled -and @($installed.paths | Where-Object { $_.enabled }).Count -eq 4) '安装当前用户的开始菜单/桌面启动停止图标'
+    $legacyTarget = Join-Path $env:WINDIR 'System32/WindowsPowerShell/v1.0/powershell.exe'
+    $script:fakeLinks[$plan[0].path].TargetPath = $legacyTarget
     $installedAgain = Set-ApplicationShortcut $true
     Assert-Windows ($installedAgain.enabled -and $script:fakeLinks.Count -eq 4) '重复安装幂等'
+    Assert-Windows ($script:fakeLinks[$plan[0].path].TargetPath -eq (Join-Path $PSHOME 'pwsh.exe')) '同项目旧快捷图标升级到PowerShell7'
     $removed = Set-ApplicationShortcut $false
     Assert-Windows (-not $removed.enabled -and @($plan | Where-Object { Test-Path -LiteralPath $_.path }).Count -eq 0) '移除只删除当前项目图标'
     [IO.File]::WriteAllText($plan[0].path, 'foreign shortcut')

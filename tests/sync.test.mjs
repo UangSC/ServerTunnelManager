@@ -89,3 +89,18 @@ test('实际 Python 远端程序执行原子写入、读取和并发修订检查
   assert.deepEqual(JSON.parse(run('read').stdout).bundle,bundle);
 });
 test('远端没有快照时给出明确提示',async()=>{const f=fixture();await assert.rejects(f.store.pull(config(),false),/尚无/);});
+
+
+test('专用隧道从Windows发布到Mac并回传：保留元数据和各设备本机端口，不同步浏览器目录与密码',async()=>{
+  const windows=config();Object.assign(windows.tunnels[0],{kind:'dedicated',proxyAccount:'example',ispId:'ISP-01',proxyExitIp:'203.0.113.10',proxyRoute:'vpn',browserProfile:'C:/private/profile',proxyPassword:'private-password'});
+  const f=fixture(),published=await f.store.publishPreview(windows,[],false);await f.store.publish(published.token,windows);
+  const mac=config();mac.settings.defaultKeyPath='data/ssh/id_ed25519';mac.servers[0].keyPath='data/ssh/id_ed25519';mac.tunnels[0].localPort=38001;
+  const pulled=await f.store.pull(mac,false),merged=f.store.prepareApply(pulled.token,mac);
+  assert.equal(merged.tunnels[0].kind,'dedicated');assert.equal(merged.tunnels[0].localPort,38001);assert.equal(merged.servers[0].keyPath,'data/ssh/id_ed25519');
+  for(const name of ['proxyAccount','ispId','proxyExitIp','proxyRoute'])assert.equal(merged.tunnels[0][name],windows.tunnels[0][name]);
+  assert.ok(!JSON.stringify(f.remote).includes('private-'));assert.ok(!JSON.stringify(f.remote).includes('browserProfile'));
+  const returned=mergeListings(windows,makeBundle({...mac,...merged},[],false));assert.equal(returned.tunnels[0].localPort,29090);assert.equal(returned.tunnels[0].kind,'dedicated');
+  const old=makeBundle(config(),[],false);delete old.tunnels[0].kind;delete old.tunnels[0].proxyRoute;
+  assert.equal(validateBundle(old).tunnels[0].kind,'standard');assert.equal(validateBundle(old).tunnels[0].proxyRoute,'unknown');
+  for(const change of [t=>t.kind='bad',t=>t.proxyExitIp='not-ip',t=>t.proxyRoute='bad',t=>t.proxyAccount='x'.repeat(101)]){const bad=structuredClone(f.remote);change(bad.tunnels[0]);assert.throws(()=>validateBundle(bad));}
+});

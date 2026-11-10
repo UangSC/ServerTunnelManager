@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 # Current-user application integration. No Node, elevation, config writes or
 # launch actions are required to inspect/install/remove these shortcuts.
 
@@ -25,7 +25,7 @@ function Get-PanelShortcutLocations {
 function Get-PanelShortcutSpecifications {
     $locations = Get-PanelShortcutLocations
     $root = [IO.Path]::GetFullPath($script:RootDir)
-    $powerShell = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $powerShell = Join-Path $PSHOME 'pwsh.exe'
     foreach ($location in $locations.Keys) {
         foreach ($action in @('Start', 'Stop')) {
             $scriptPath = Join-Path $root ($action + '-Panel.ps1')
@@ -54,7 +54,8 @@ function Test-PanelShortcutOwned($shell, $specification) {
     $shortcut = $null
     try {
         $shortcut = $shell.CreateShortcut($specification.path)
-        return ([string]$shortcut.TargetPath -ieq [string]$specification.target -and
+        return (([string]$shortcut.TargetPath -ieq [string]$specification.target -or
+            [string]$shortcut.TargetPath -ieq (Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe')) -and
             [string]$shortcut.Arguments -ceq [string]$specification.arguments -and
             [string]$shortcut.WorkingDirectory -ieq [string]$specification.workingDirectory)
     } catch { return $false }

@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 # ============================================================
 #  Tunnel Studio - local web server
 #  Loopback-only HttpListener alternative (raw TcpListener),
@@ -699,7 +699,7 @@ function Invoke-ApiRoute($request) {
         $arguments = @()
         switch ($shellName) {
             'powershell' {
-                $terminalPath = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+                $terminalPath = Join-Path $PSHOME 'pwsh.exe'
                 $arguments = @('-NoLogo', '-NoProfile', '-NoExit')
             }
             'cmd' { $terminalPath = Join-Path $env:WINDIR 'System32\cmd.exe' }

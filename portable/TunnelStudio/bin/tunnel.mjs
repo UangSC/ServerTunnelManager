@@ -21,13 +21,14 @@ Input: --json '{...}' | --file FILE | --file - (stdin), or named fields
 Examples:
   server add --name demo --host 192.0.2.10 --port 22 --user alice
   tunnel add --name web --server-id srv-ID --local-port 18080 --remote-port 8080 --probe http
+  tunnel update t-ID --kind dedicated --proxy-account example --isp-id ISP-01 --proxy-exit-ip 203.0.113.10 --proxy-route direct
   settings set --simulation false --auto-open-on-launch true
 Output: JSON on stdout, errors on stderr, nonzero exit on failure.
 No browser, no automatic SSH enrollment, no token written to disk.
 URL may also be set with TUNNEL_STUDIO_URL; timeout with --timeout (milliseconds).
 Deleting resources, importing, resetting and batch delete require --yes.
 `;
-const fields = new Set(['name','host','port','user','keyPath','note','color','serverId','localHost','localPort','remoteHost','remotePort','probe','openUrl','group','autoOpen',
+const fields = new Set(['name','host','port','user','keyPath','note','color','serverId','localHost','localPort','remoteHost','remotePort','probe','openUrl','group','autoOpen','kind','proxyAccount','ispId','proxyExitIp','proxyRoute',
   'theme','accent','simulation','refreshMs','latencyProbe','autoReconnect','confirmDelete','autoOpenOnLaunch','panelPort','defaultUser','defaultPort','defaultKeyPath','connectTimeout','serverAliveInterval','serverAliveCountMax','strictHostKeyChecking','openBrowserOnStart','logRetention']);
 const booleanFields = new Set(['autoOpen','simulation','latencyProbe','autoReconnect','confirmDelete','autoOpenOnLaunch','strictHostKeyChecking','openBrowserOnStart']);
 const numberFields = new Set(['port','localPort','remotePort','refreshMs','panelPort','defaultPort','connectTimeout','serverAliveInterval','serverAliveCountMax','logRetention']);

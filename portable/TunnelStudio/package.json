@@ -1,6 +1,6 @@
 {
   "name": "tunnel-studio-macos",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "type": "module",
   "description": "macOS 本地 SSH 隧道控制台",

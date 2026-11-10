@@ -92,6 +92,10 @@
           <span class="nav-text">隧道</span>
           <span class="nav-count" id="navTunnelCount">0</span>
         </button>
+        <button class="nav-item" data-nav="dedicated">
+          <svg class="icon"><use href="#i-shield"/></svg><span class="nav-text">专用隧道</span>
+          <span class="nav-count" id="navDedicatedCount">0</span>
+        </button>
         <button class="nav-item" data-nav="servers">
           <svg class="icon"><use href="#i-server"/></svg>
           <span class="nav-text">服务器</span>
@@ -260,6 +264,7 @@
               <span class="count-pill" id="overviewCount">0</span>
             </div>
             <div class="section-tools">
+              <div class="layout-switch" role="group" aria-label="隧道显示方式" data-layout-target="tunnelGrid"><button type="button" data-layout="cards" aria-pressed="true" title="卡片视图"><svg class="icon"><use href="#i-grid"/></svg><span>卡片</span></button><button type="button" data-layout="list" aria-pressed="false" title="列表视图"><svg class="icon"><use href="#i-list"/></svg><span>列表</span></button></div>
               <div class="chip-row" id="overviewFilterChips">
                 <button class="chip is-active" data-filter-status="all">全部</button>
                 <button class="chip" data-filter-status="online">运行中</button>
@@ -275,6 +280,9 @@
             <div class="skeleton-card"></div>
           </div>
 
+          <div class="section-head dedicated-section-head"><div class="section-title"><h2>专用隧道</h2><span class="count-pill" id="dedicatedOverviewCount">0</span></div><div class="section-tools"><div class="layout-switch" role="group" aria-label="隧道显示方式" data-layout-target="dedicatedOverviewGrid"><button type="button" data-layout="cards" aria-pressed="true" title="卡片视图"><svg class="icon"><use href="#i-grid"/></svg><span>卡片</span></button><button type="button" data-layout="list" aria-pressed="false" title="列表视图"><svg class="icon"><use href="#i-list"/></svg><span>列表</span></button></div><button class="btn btn-ghost" data-nav="dedicated">管理专用隧道 <svg class="icon"><use href="#i-chevron-right"/></svg></button></div></div>
+          <p class="dedicated-intro">每个账号使用固定代理入口。复制 HTTP 代理地址后，在对应浏览器或应用中配置。</p>
+          <div class="tunnel-grid" id="dedicatedOverviewGrid"></div>
           <div class="lower-grid">
             <section class="panel activity-panel">
               <div class="panel-head">
@@ -314,6 +322,37 @@
           </div>
         </section>
 
+        <section class="view" data-view="dedicated" id="viewDedicated" hidden>
+          <div class="page-head">
+          <div>
+          <h1>专用隧道</h1>
+          <p>绑定账号与固定 ISP，经 SSH 安全转发到本机。</p>
+          </div>
+          <button class="btn btn-primary" data-action="new-dedicated">
+          <svg class="icon">
+          <use href="#i-plus"/>
+          </svg>新建专用隧道</button>
+          </div>
+          <div class="section-head">
+          <p class="dedicated-intro">ISP 认证由服务器管理；这里保存代理入口及预期出口。SSH 连通不代表出口已验证。</p>
+          <div class="layout-switch" role="group" aria-label="隧道显示方式" data-layout-target="dedicatedGrid">
+          <button type="button" data-layout="cards" aria-pressed="true" title="卡片视图">
+          <svg class="icon">
+          <use href="#i-grid"/>
+          </svg>
+          <span>卡片</span>
+          </button>
+          <button type="button" data-layout="list" aria-pressed="false" title="列表视图">
+          <svg class="icon">
+          <use href="#i-list"/>
+          </svg>
+          <span>列表</span>
+          </button>
+          </div>
+          </div>
+          <div class="tunnel-grid" id="dedicatedGrid">
+          </div>
+          </section>
         <!-- ══════════════ TUNNELS ══════════════ -->
         <section class="view" data-view="tunnels" id="viewTunnels" hidden>
           <div class="page-head">
@@ -817,6 +856,7 @@
   <div class="ui-tooltip" id="uiTooltip" role="tooltip" hidden></div>
 
   <noscript><div class="noscript">Tunnel Studio 需要启用 JavaScript。</div></noscript>
+  <script src="/assets/tunnel-workbench.js?v=__APP_VERSION__" defer></script>
   <script src="/assets/app.js?v=__APP_VERSION__" defer></script>
   <script src="/assets/sync-ui.js?v=__APP_VERSION__" defer></script>
   <script src="/assets/application-shortcut-ui.js?v=__APP_VERSION__" defer></script>

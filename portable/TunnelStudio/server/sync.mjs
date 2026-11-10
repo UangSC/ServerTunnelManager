@@ -1,3 +1,4 @@
+import net from 'node:net';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -11,7 +12,7 @@ const quote = value => "'" + String(value).replaceAll("'", "'\\''") + "'";
 const now = () => new Date().toISOString();
 const fields = (value, names) => Object.fromEntries(names.map(name => [name, value[name]]));
 const serverFields = ['id','name','host','port','user','note','color'];
-const tunnelFields = ['id','name','serverId','localHost','localPort','remoteHost','remotePort','probe','openUrl','group','note'];
+const tunnelFields = ['id','name','serverId','localHost','localPort','remoteHost','remotePort','probe','openUrl','group','note','kind','proxyAccount','ispId','proxyExitIp','proxyRoute'];
 function string(value, label, max = 200, empty = false) {
   if (typeof value !== 'string' || (!empty && !value.trim()) || value.length > max || /[\x00-\x1f\x7f]/.test(value)) fail(label + '格式错误。');
   return value.trim();
@@ -37,7 +38,13 @@ export function validateBundle(value) {
     const endpoint=JSON.stringify([s.host.toLowerCase(),s.port,s.user]); if(endpoints.has(endpoint))fail('重复服务器连接。'); endpoints.add(endpoint); return s;
   });
   const tunnels = list(value.tunnels,200).map(raw => {
-    const t=fields(raw,tunnelFields); t.id=id(t.id); t.name=string(t.name,'隧道名称',60);
+    const t=fields(raw,tunnelFields);
+    t.kind=t.kind===undefined?'standard':t.kind;
+    if(!['standard','dedicated'].includes(t.kind))fail('隧道类型无效。');
+    t.proxyAccount=string(t.proxyAccount??'','绑定账号',100,true);t.ispId=string(t.ispId??'','ISP 标识',32,true);
+    t.proxyExitIp=string(t.proxyExitIp??'','出口 IP',45,true);if(t.proxyExitIp&&!net.isIP(t.proxyExitIp))fail('出口 IP 格式无效。');
+    t.proxyRoute=t.proxyRoute===undefined?'unknown':t.proxyRoute;if(!['unknown','direct','vpn'].includes(t.proxyRoute))fail('代理路由无效。');
+    t.id=id(t.id); t.name=string(t.name,'隧道名称',60);
     if (!servers.some(s=>s.id===t.serverId)) fail('隧道引用了不存在的服务器。');
     if (!['127.0.0.1','localhost'].includes(t.localHost)) fail('同步仅支持本机回环端口。'); t.localHost='127.0.0.1';
     t.localPort=port(t.localPort); if(ports.has(t.localPort))fail('同步包中存在重复本机端口。'); ports.add(t.localPort);

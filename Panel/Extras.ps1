@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 # ============================================================
 #  Tunnel Studio - extras
 #  Autostart, passwordless onboarding, server probing,
@@ -232,18 +232,7 @@ function Invoke-NativeProcess {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $FilePath
     if ($ArgumentList) {
-        # ArgumentList 只存在于 .NET Core/PowerShell 7；Windows PowerShell 5.1 回退到安全的 argv 引号规则。
-        $argumentListProperty = $psi.PSObject.Properties['ArgumentList']
-        if ($null -ne $argumentListProperty) {
-            foreach ($argument in $ArgumentList) { [void]$psi.ArgumentList.Add([string]$argument) }
-        } else {
-            $quoted = foreach ($argument in $ArgumentList) {
-                $value = [string]$argument
-                if ($value -notmatch '[\s"]') { $value; continue }
-                '"' + (($value -replace '(\\*)"', '$1$1\\"') -replace '(\\+)$', '$1$1') + '"'
-            }
-            $psi.Arguments = ($quoted -join ' ')
-        }
+        foreach ($argument in $ArgumentList) { [void]$psi.ArgumentList.Add([string]$argument) }
     } else {
         $psi.Arguments = $Arguments
     }
@@ -556,7 +545,7 @@ function Invoke-PasswordStep($job, $step) {
                 return $false
             }
             $askpass = Join-Path $env:TEMP ('tunnelstudio-askpass-' + [guid]::NewGuid().ToString('N') + '.cmd')
-            $askpassContent = "@echo off`r`npowershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command `"[Console]::Out.Write(`$env:TUNNELSTUDIO_PASSWORD)`"`r`n"
+            $askpassContent = "@echo off`r`npwsh.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command `"[Console]::Out.Write(`$env:TUNNELSTUDIO_PASSWORD)`"`r`n"
             try {
                 [System.IO.File]::WriteAllText($askpass, $askpassContent, [System.Text.Encoding]::ASCII)
                 # 用 base64 把公钥作为数据传给远端，避免公钥注释中的特殊字符破坏 shell 引号。

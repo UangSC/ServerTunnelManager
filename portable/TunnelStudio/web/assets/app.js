@@ -414,6 +414,7 @@
   const VIEW_META = {
     overview: { title: '总览', crumb: '总览' },
     tunnels: { title: '隧道', crumb: '隧道' },
+    dedicated: { title: '专用隧道', crumb: '专用隧道' },
     servers: { title: '服务器', crumb: '服务器' },
     logs: { title: '运行日志', crumb: '运行日志' },
     access: { title: '免密登录', crumb: '免密登录' },
@@ -452,7 +453,8 @@
   function renderNav() {
     const online = (S.tunnels || []).filter((t) => (S.runtime[t.id] || {}).status === 'online').length;
     $('#navOnlineBadge').textContent = online;
-    $('#navTunnelCount').textContent = S.tunnels.length;
+    $('#navTunnelCount').textContent = S.tunnels.filter(t => t.kind !== 'dedicated').length;
+    $('#navDedicatedCount').textContent = S.tunnels.filter(t => t.kind === 'dedicated').length;
     $('#navServerCount').textContent = S.servers.length;
     const first = S.servers[0];
     if (first) {
@@ -511,7 +513,8 @@
     if (S.sshAvailable) badges.push(`<span class="pill pill-muted">OpenSSH 就绪</span>`);
     else badges.push(`<span class="pill pill-red">未找到 ssh</span>`);
     $('#heroBadges').innerHTML = badges.join('');
-    $('#overviewCount').textContent = total;
+    $('#overviewCount').textContent = S.tunnels.filter(t => t.kind !== 'dedicated').length;
+    $('#dedicatedOverviewCount').textContent = S.tunnels.filter(t => t.kind === 'dedicated').length;
     renderActivity();
   }
 
@@ -545,7 +548,11 @@
   function renderTunnelGrid() {
     const grid = $('#tunnelGrid');
     if (!grid) return;
-    const cards = S.tunnels.map((t) => tunnelCard(t)).join('');
+    const cards = S.tunnels.filter(t => t.kind !== 'dedicated').map((t) => tunnelCard(t)).join('');
+    const dedicated = S.tunnels.filter(t => t.kind === 'dedicated').map(t => tunnelCard(t)).join('');
+    for (const id of ['dedicatedOverviewGrid', 'dedicatedGrid']) {
+      $('#' + id).innerHTML = dedicated + `<button class="tunnel-add" data-action="new-dedicated"><span class="add-circle">${icon('plus')}</span><span>新建专用隧道</span><small>账号 → 固定代理入口</small></button>`;
+    }
     grid.innerHTML = cards + `<button class="tunnel-add" data-action="new-tunnel" aria-label="新建隧道">
       <span class="add-circle">${icon('plus')}</span>
       <span>新建端口映射</span>
@@ -567,7 +574,7 @@
     const points = sparkPoints(spark, 92, 26, 2);
     const error = esc(state.error || (state.probeError ? '远端探测：' + state.probeError : ''));
     const url = t.url || '';
-    return `<article class="tunnel-card" data-id="${esc(t.id)}" data-status="${status}" tabindex="0" aria-label="${esc(t.name)}">
+    return `<article class="tunnel-card" data-kind="${t.kind === 'dedicated' ? 'dedicated' : 'standard'}" data-id="${esc(t.id)}" data-status="${status}" tabindex="0" aria-label="${esc(t.name)}">
       <div class="tc-head">
         <div class="tc-titlewrap">
           <div class="tc-title"><span class="status-dot"></span><h3>${esc(t.name)}</h3></div>
@@ -586,6 +593,7 @@
           </label>
         </div>
       </div>
+      ${TunnelWorkbench.summary(t)}
       <div class="tc-route">
         <div class="endpoint">
           <span class="endpoint-label">LOCAL</span>
@@ -618,7 +626,7 @@
           ${url ? `<button class="quick-btn accent" data-act="open-url">${icon('external')}打开</button>` : ''}
           ${url ? `<button class="quick-btn" data-act="connection" title="查看连接信息与后端地址" aria-label="连接信息">${icon('info')}</button>` : ''}
           <button class="quick-btn" data-act="port" title="端口诊断：查看占用进程" aria-label="端口诊断" ${status === 'occupied' ? '' : 'hidden'}>${icon('search')}</button>
-          <button class="quick-btn" data-act="copy">${icon('copy')}复制</button>
+          <button class="quick-btn" data-act="copy">${icon('copy')}${t.kind === 'dedicated' ? '代理地址' : '复制'}</button>
           <button class="quick-btn" data-act="menu">${icon('more')}更多</button>
         </div>
       </div>
@@ -746,6 +754,7 @@
   }
 
   function tunnelMatches(t) {
+    if (t.kind === 'dedicated') return false;
     const state = S.runtime[t.id] || {};
     const status = state.status || 'offline';
     const filter = S.tunnelFilter;
@@ -1232,6 +1241,7 @@
     }
     body.innerHTML = `
       <form class="drawer-form" id="drawerForm">
+        ${TunnelWorkbench.fields(t)}
         <div class="field"><span>名称</span><input name="name" value="${esc(t.name)}" maxlength="60" required></div>
         <div class="form-grid two">
           <div class="field"><span>本机端口</span><input name="localPort" type="number" min="1" max="65535" value="${t.localPort}" required></div>
@@ -1382,7 +1392,7 @@
   /* ------------------------------------------------------------
      Tunnel form
      ------------------------------------------------------------ */
-  function openTunnelModal(tunnel = null) {
+  function openTunnelModal(tunnel = null, kind = (S.view === 'dedicated' ? 'dedicated' : 'standard')) {
     if (!S.servers.length) {
       toast('warning', '还没有服务器', '请先在「服务器」页添加一台 SSH 服务器。');
       setView('servers');
@@ -1390,12 +1400,13 @@
     }
     const isEdit = !!tunnel;
     const defaults = {
-      name: '', serverId: S.servers[0].id, localPort: '', remotePort: '',
-      remoteHost: '127.0.0.1', localHost: '127.0.0.1', probe: 'auto', group: '', note: '', openUrl: '', autoOpen: false
+      name: '', kind, serverId: S.servers[0].id, localPort: '', remotePort: '',
+      remoteHost: '127.0.0.1', localHost: '127.0.0.1', probe: kind === 'dedicated' ? 'tcp' : 'auto', group: '', note: '', openUrl: '', autoOpen: false
     };
     const t = isEdit ? tunnel : defaults;
     const groups = Array.from(new Set(S.tunnels.map((x) => x.group).filter(Boolean)));
     const body = `<form class="modal-form" id="tunnelForm">
+      ${TunnelWorkbench.fields(t)}
       <div class="preset-row" id="tunnelPresets">
         <span>常用模板</span>
         <button type="button" class="preset-chip" data-preset="9090">Mihomo 面板</button>
@@ -1429,7 +1440,7 @@
       <div class="form-error" id="tunnelFormError" hidden></div>
     </form>`;
     openModal({
-      title: isEdit ? '编辑隧道' : '新建隧道',
+      title: isEdit ? '编辑隧道' : (kind === 'dedicated' ? '新建专用隧道' : '新建隧道'),
       subtitle: isEdit ? '修改端口或服务器后，请重启隧道让配置生效。' : '所有映射都从本机 127.0.0.1 转发到服务器，无需开放公网端口。',
       body,
       wide: true,
@@ -1468,6 +1479,7 @@
   }
 
   function bindTunnelUrlPort(form) {
+    TunnelWorkbench.bindForm(form);
     const port = form.elements.namedItem('localPort');
     const urlInput = form.elements.namedItem('openUrl');
     let previousPort = Number(port.value);
@@ -1511,6 +1523,7 @@
       remotePort,
       probe: form.probe.value,
       openUrl: form.openUrl.value.trim(),
+      ...TunnelWorkbench.payload(form),
       group: form.group.value.trim(),
       note: form.note.value.trim(),
       autoOpen: form.autoOpen.checked
@@ -2678,6 +2691,7 @@
      Events
      ------------------------------------------------------------ */
   function bindEvents() {
+    TunnelWorkbench.init({newTunnel: openTunnelModal, cardClick: handleTunnelCardClick, openDrawer});
     // Navigation
     document.addEventListener('click', (event) => {
       const nav = event.target.closest('[data-nav]');
@@ -3001,7 +3015,7 @@
         if (t) showPortDiagnosis(t);
       } else if (act === 'copy') {
         const t = S.tunnels.find((x) => x.id === id);
-        if (t) copyLocal(t);
+        if (t) { if (t.kind === 'dedicated') copyText(`http://127.0.0.1:${t.localPort}`, '已复制代理地址'); else copyLocal(t); }
       } else if (act === 'menu') {
         openDrawer(id, 'settings');
       } else if (act === 'toggle') {

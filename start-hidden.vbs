@@ -9,7 +9,7 @@ Set shell = CreateObject("WScript.Shell")
 baseDir = fso.GetParentFolderName(WScript.ScriptFullName)
 shell.CurrentDirectory = baseDir
 
-command = "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File """ _
+command = "pwsh.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File """ _
     & baseDir & "\Start-Panel.ps1"" -NoBrowser -Quiet"
 
 shell.Run command, 0, False

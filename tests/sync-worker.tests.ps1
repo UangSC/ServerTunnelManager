@@ -1,5 +1,7 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 $ErrorActionPreference = 'Stop'
+$OutputEncoding = New-Object Text.UTF8Encoding($false)
+[Console]::OutputEncoding = $OutputEncoding
 $sourceRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $sourceRoot 'Panel/Core.ps1')
 . (Join-Path $sourceRoot 'Panel/Sync.ps1')
@@ -14,7 +16,7 @@ $script:LogDir = Join-Path $script:PanelDir 'logs'
 $script:Config = New-DefaultConfig
 $script:Config.settings.theme = 'light'
 $script:Config.servers = @([ordered]@{id='srv-1';name='测试服务器';host='example.com';port=22;user='deploy';keyPath='local-key';passwordless=$true})
-$script:Config.tunnels = @([ordered]@{id='t-1';name='测试面板';serverId='srv-1';localHost='127.0.0.1';localPort=29090;remoteHost='127.0.0.1';remotePort=9090;probe='auto';openUrl='http://127.0.0.1:29090/';autoOpen=$true})
+$script:Config.tunnels = @([ordered]@{id='t-1';name='测试面板';serverId='srv-1';localHost='127.0.0.1';localPort=29090;remoteHost='127.0.0.1';remotePort=9090;probe='auto';openUrl='http://127.0.0.1:29090/';autoOpen=$true;kind='dedicated';proxyAccount='测试账号';ispId='ISP-01';proxyExitIp='203.0.113.10';proxyRoute='vpn'})
 function Stop-AllTunnels { return 0 }
 function Assert-Sync($condition,$message) { if (-not $condition) { throw $message }; Write-Output "通过：$message" }
 $settings = Invoke-SyncWorker 'settings'
@@ -45,3 +47,5 @@ Assert-Sync ($script:Config.settings.theme -eq 'light') 'Windows 保留本机主
 $rejected = $false
 try { Apply-SyncPreview @{token=$preview.token;confirm=$true} } catch { $rejected = $true }
 Assert-Sync $rejected 'Windows 已使用预览不能重复覆盖'
+
+Assert-Sync ($script:Config.tunnels[0].kind -eq 'dedicated' -and $script:Config.tunnels[0].proxyAccount -eq '测试账号' -and $script:Config.tunnels[0].proxyExitIp -eq '203.0.113.10' -and $script:Config.tunnels[0].proxyRoute -eq 'vpn') 'Windows worker 保留专用隧道和中文账号'

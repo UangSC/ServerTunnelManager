@@ -1,14 +1,14 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 # ============================================================
 #  Tunnel Studio - core engine
 #  Config store, runtime state, tunnel operations, metrics.
-#  Compatible with Windows PowerShell 5.1 and PowerShell 7.x
+#  Requires PowerShell 7.x on Windows
 # ============================================================
 
 $ErrorActionPreference = 'Stop'
 
 $script:AppName = 'tunnel-studio'
-$script:AppVersion = '1.4.0'
+$script:AppVersion = '1.5.0'
 $script:PanelDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $script:RootDir = Split-Path -Parent $script:PanelDir
 $script:WebDir = Join-Path $script:PanelDir 'web'
@@ -446,6 +446,11 @@ function Load-Config {
         if ($probe -notin @('auto', 'http', 'socks5', 'tcp', 'none')) { $probe = 'auto' }
         [void]$tunnels.Add([ordered]@{
             id         = if ([string]::IsNullOrWhiteSpace([string]$tunnel.id)) { New-Id 't-' } else { [string]$tunnel.id }
+            kind = if ($tunnel.kind -eq 'dedicated') { 'dedicated' } else { 'standard' }
+            proxyAccount = [string]$tunnel.proxyAccount
+            ispId = [string]$tunnel.ispId
+            proxyExitIp = [string]$tunnel.proxyExitIp
+            proxyRoute = if ($tunnel.proxyRoute -in @('direct', 'vpn')) { [string]$tunnel.proxyRoute } else { 'unknown' }
             legacyId   = $tunnel.legacyId
             name       = [string]$tunnel.name
             serverId   = $serverId
@@ -478,6 +483,18 @@ function Get-ServerFrom($servers, [string]$id) {
 
 function Get-TunnelInput($body, [string]$existingId = '') {
     if ($null -eq $body) { $body = @{} }
+    $kind = if ($null -eq $body.kind) { 'standard' } else { [string]$body.kind }
+    if ($kind -notin @('standard', 'dedicated')) { throw '隧道类型无效。' }
+    $proxyRoute = if ($null -eq $body.proxyRoute) { 'unknown' } else { [string]$body.proxyRoute }
+    if ($proxyRoute -notin @('unknown', 'direct', 'vpn')) { throw '代理路由无效。' }
+    foreach ($field in @('proxyAccount', 'ispId', 'proxyExitIp')) {
+        $limit = if ($field -eq 'proxyAccount') { 100 } elseif ($field -eq 'ispId') { 32 } else { 45 }
+        if ($null -ne $body[$field] -and ($body[$field] -isnot [string] -or $body[$field].Length -gt $limit -or $body[$field] -match '[\x00-\x1f\x7f]')) { throw '专用隧道字段格式无效。' }
+    }
+    $proxyExitIp = ([string]$body.proxyExitIp).Trim()
+    $parsedIp = $null
+    if ($proxyExitIp -and -not [Net.IPAddress]::TryParse($proxyExitIp, [ref]$parsedIp)) { throw '出口 IP 格式无效。' }
+    if ($proxyExitIp -and $parsedIp.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetwork -and $proxyExitIp -cne $parsedIp.ToString()) { throw '出口 IPv4 必须为完整的四段地址。' }
     $name = ([string]$body.name).Trim()
     if ([string]::IsNullOrWhiteSpace($name)) { throw '隧道名称不能为空。' }
     if ($name.Length -gt 60) { throw '隧道名称不能超过 60 个字符。' }
@@ -523,6 +540,11 @@ function Get-TunnelInput($body, [string]$existingId = '') {
     if ($note.Length -gt 200) { throw '备注不能超过 200 个字符。' }
 
     return [ordered]@{
+        kind = $kind
+        proxyAccount = ([string]$body.proxyAccount).Trim()
+        ispId = ([string]$body.ispId).Trim()
+        proxyExitIp = $proxyExitIp
+        proxyRoute = $proxyRoute
         name       = $name
         serverId   = $serverId
         localHost  = $localHost
@@ -541,6 +563,11 @@ function Add-Tunnel($body) {
     $input = Get-TunnelInput $body
     $now = To-Iso (NowUtc)
     $tunnel = [ordered]@{
+        kind = $input.kind
+        proxyAccount = $input.proxyAccount
+        ispId = $input.ispId
+        proxyExitIp = $input.proxyExitIp
+        proxyRoute = $input.proxyRoute
         id        = New-Id 't-'
         name      = $input.name
         serverId  = $input.serverId

@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 # 本机监听归属诊断。未记录的 SSH 即使映射相同，也不自动接管或结束。
 function Split-NativeCommandLine([string]$commandLine) {
     if (-not ('TunnelStudio.NativeArgs' -as [type])) {

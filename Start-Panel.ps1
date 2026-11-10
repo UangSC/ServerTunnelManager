@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 <#
     Tunnel Studio · launcher
     Starts the local panel server in a hidden background process and opens
@@ -105,8 +105,7 @@ if (Test-PanelHealth) {
     exit 0
 }
 
-$currentExe = (Get-Process -Id $PID).Path
-if ([string]::IsNullOrWhiteSpace($currentExe)) { $currentExe = 'powershell.exe' }
+$currentExe = Join-Path $PSHOME 'pwsh.exe'
 
 if ($Foreground) {
     & $currentExe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $server -Port $listenPort

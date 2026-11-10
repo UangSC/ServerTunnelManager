@@ -44,10 +44,10 @@ node --test portable/TunnelStudio/tests/*.test.mjs tests/sync.test.mjs
 Windows 测试：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\http.tests.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\ports.tests.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-integration.tests.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-api.tests.ps1
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests\http.tests.ps1
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests\ports.tests.ps1
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-integration.tests.ps1
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-api.tests.ps1
 ```
 
 测试使用独立临时目录、文档地址、模拟 SSH 或无网络 sentinel，不连接生产服务器。[Windows API 回归](<tests/windows-api.tests.ps1>) 必须针对临时实际 PowerShell 服务验证共享 Node CLI，防止两个后端的健康标识、响应结构或字段漂移。
@@ -79,3 +79,12 @@ git push origin main
 ```
 
 审查脚本只检查 Git 索引中的文件内容，不读取未跟踪的用户秘密；检查路径、二进制/产物、凭据模式和非示例公网 IPv4。它不能代替人工审查，也不保证发现所有秘密。不要为了让扫描通过而绕过忽略或用高权限强制提交。
+
+
+## 维护边界与 Windows 运行时
+
+Windows 从 1.5 起仅使用 PowerShell 7.x。`.cmd` 入口经 `bin/pwsh.cmd` 检查可执行文件；`.ps1` 用 `#requires -Version 7.0` 拒绝旧版。后台服务、快捷图标和诊断终端使用当前 `$PSHOME/pwsh.exe`。旧版同项目快捷图标只作为迁移识别对象，启用快捷图标时改写为 PowerShell 7；不再保留 5.x 运行分支。
+
+根目录仅保留说明和已有用户入口，不新增业务实现或一次性迁移脚本。新增共用浏览器行为放 `shared/`，静态分发由 `scripts/sync-shared.mjs` 管理；Windows 后端放 `Panel/`，Node 后端放 `portable/TunnelStudio/server/`，可重复维护工具放 `scripts/`，验证放 `tests/` 或 portable 的测试目录。个人部署记录和截图放被忽略的 `reports/`，不能随源码提交。
+
+专用隧道仍属于同一个 `tunnels` 集合，通过 `kind` 分类，复用原有 SSH/API/日志流程，不创建第二套进程管理器。`shared/tunnel-workbench.js` 负责表单附加字段、布局记忆、动画和专用信息展示；平台主 UI 只提供渲染和事件入口。布局偏好使用浏览器本机存储，不混入服务器同步白名单。

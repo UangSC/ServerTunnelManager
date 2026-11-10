@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 # Windows 面板与 macOS/Linux 共用同步格式、SSH 传输和预览校验。
 function Invoke-SyncWorker([string]$action, $body = @{}) {
     $node = Get-Command node.exe -ErrorAction SilentlyContinue
@@ -7,7 +7,8 @@ function Invoke-SyncWorker([string]$action, $body = @{}) {
     $payload = [ordered]@{ root = $script:RootDir; action = $action; body = $body; config = $script:Config; logs = @($script:LogBuffer.ToArray()) }
     $start = New-Object System.Diagnostics.ProcessStartInfo
     $start.FileName = $node.Source
-    $start.Arguments = '"' + $worker + '" --worker'
+    $start.ArgumentList.Add($worker)
+    $start.ArgumentList.Add('--worker')
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
     $start.RedirectStandardInput = $true
