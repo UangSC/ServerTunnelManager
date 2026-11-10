@@ -87,4 +87,4 @@ Windows 从 1.5 起仅使用 PowerShell 7.x。`.cmd` 入口经 `bin/pwsh.cmd` �
 
 根目录仅保留说明和已有用户入口，不新增业务实现或一次性迁移脚本。新增共用浏览器行为放 `shared/`，静态分发由 `scripts/sync-shared.mjs` 管理；Windows 后端放 `Panel/`，Node 后端放 `portable/TunnelStudio/server/`，可重复维护工具放 `scripts/`，验证放 `tests/` 或 portable 的测试目录。个人部署记录和截图放被忽略的 `reports/`，不能随源码提交。
 
-专用隧道仍属于同一个 `tunnels` 集合，通过 `kind` 分类，复用原有 SSH/API/日志流程，不创建第二套进程管理器。`shared/tunnel-workbench.js` 负责表单附加字段、布局记忆、动画和专用信息展示；平台主 UI 只提供渲染和事件入口。布局偏好使用浏览器本机存储，不混入服务器同步白名单。
+专用隧道仍属于同一个 `tunnels` 集合，通过 `kind` 分类，复用原有 SSH/API/日志流程，不创建第二套进程管理器。`shared/tunnel-workbench.js` 负责表单附加字段、列表行结构、操作菜单、布局记忆、切换动画和专用信息展示；平台主 UI 只提供渲染和事件入口。行与卡片只渲染“开关 + 更多”，功能项由 `TunnelWorkbench.menuItems()` 按隧道状态生成，再由平台实现具体动作，避免两套按钮逻辑分叉。布局偏好使用浏览器本机存储，不混入服务器同步白名单。

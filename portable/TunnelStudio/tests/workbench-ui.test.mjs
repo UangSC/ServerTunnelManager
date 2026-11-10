@@ -34,13 +34,25 @@ test('同步账号和出口作为文本显示，不能注入HTML；表单只包�
 });
 
 
-test('列表行保留开关与实时状态钩子；无页面地址也可查看连接信息，字段不可注入',()=>{
+test('列表行保留开关与实时状态钩子；其余功能集中到同一个操作菜单',()=>{
   const f=fixture(),t={id:'t-1',name:'<img onerror=bad>',kind:'dedicated',proxyAccount:'account"<script>',localHost:'127.0.0.1',localPort:18001,remoteHost:'127.0.0.1',remotePort:18001,proxyExitIp:'203.0.113.1',proxyRoute:'vpn'};
   const html=f.workbench.row(t,{state:{status:'occupied',error:'<script>bad</script>'},server:{host:'example.com'},statusLabel:'端口占用',icon:name=>`<svg data-icon="${name}"></svg>`});
   assert.ok(!html.includes('<script>'));assert.ok(!html.includes('<img'));assert.ok(html.includes('&lt;script&gt;'));
-  for(const hook of ['data-role="toggle"','data-live="status"','data-live="latency"','data-live="error"','data-act="connection"','data-act="port"','data-act="copy"'])assert.ok(html.includes(hook),hook);
+  for(const hook of ['data-role="toggle"','data-live="status"','data-live="latency"','data-live="error"','data-act="menu"'])assert.ok(html.includes(hook),hook);
   assert.ok(!html.includes('data-act="open-url"'));
+  // 行内不再堆叠功能按钮，操作列只有开关与“更多”。
+  for(const legacy of ['data-act="copy"','data-act="connection"','data-act="port"','data-act="logs"','data-act="edit"'])assert.ok(!html.includes(legacy),legacy);
   assert.ok(html.indexOf('data-role="toggle"')>html.indexOf('wb-actions tc-actions'));
   const active=f.workbench.row({...t,url:'http://127.0.0.1:18001/'},{state:{status:'online'},server:{host:'example.com'},statusLabel:'运行中',icon:()=>''});
-  assert.match(active,/data-role="toggle"[^>]*checked/);assert.ok(active.includes('data-act="open-url"'));
+  assert.match(active,/data-role="toggle"[^>]*checked/);assert.ok(active.includes('data-act="menu"'));
+});
+
+test('操作菜单按可用功能生成，避免出现没用的按钮',()=>{
+  const f=fixture();
+  const acts=list=>JSON.parse(JSON.stringify(list.filter(item=>item.act).map(item=>item.act)));
+  const t={id:'t-1',name:'n',kind:'standard',localHost:'127.0.0.1',localPort:18001,remoteHost:'127.0.0.1',remotePort:18001};
+  assert.deepEqual(acts(f.workbench.menuItems(t,{active:false})),['connection','copy','port','edit','logs','delete']);
+  assert.deepEqual(acts(f.workbench.menuItems({...t,url:'http://127.0.0.1:18001/'},{active:true})),['open-url','connection','copy','port','restart','edit','logs','delete']);
+  assert.deepEqual(acts(f.workbench.menuItems({...t,kind:'dedicated'},{active:false})),['connection','copy','port','edit','logs','delete']);
+  assert.ok(f.workbench.menuItems(t,{active:false}).some(item=>item.separator));
 });

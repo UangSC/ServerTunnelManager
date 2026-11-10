@@ -570,25 +570,27 @@
     const latency = state.latency != null ? `${state.latency} ms` : (online ? '探测中' : '—');
     const uptime = online ? fmtDuration(state.uptimeSec) : '—';
     const pid = state.pid != null ? String(state.pid) : '—';
-    const spark = state.latencyHistory && state.latencyHistory.length ? state.latencyHistory : [0, 0];
+    // 没有历史数据时不画空白折线，离线卡片更干净。
+    const hasSpark = Array.isArray(state.latencyHistory) && state.latencyHistory.length > 1;
+    const spark = hasSpark ? state.latencyHistory : [0, 0];
     const points = sparkPoints(spark, 92, 26, 2);
     const error = state.error ? esc(state.error) : '';
     const url = t.url || '';
     return `<article class="tunnel-card" data-kind="${t.kind === 'dedicated' ? 'dedicated' : 'standard'}" data-id="${esc(t.id)}" data-status="${status}" tabindex="0" aria-label="${esc(t.name)}">
       <div class="tc-head">
+        <span class="status-dot"></span>
         <div class="tc-titlewrap">
-          <div class="tc-title"><span class="status-dot"></span><h3>${esc(t.name)}</h3></div>
+          <div class="tc-title"><h3>${esc(t.name)}</h3></div>
           <div class="tc-sub">
             ${t.group ? `<span class="tc-group">${esc(t.group)}</span>` : ''}
             <span class="status-label" data-status="${status}" data-live="status">${statusText(status)}</span>
-            <span>·</span>
-            <span class="truncate">${esc(server.user || 'root')}@${esc(server.host || '—')}</span>
+            <span class="tc-sep">·</span>
+            <span class="tc-host truncate">${esc(server.user || 'root')}@${esc(server.host || '—')}</span>
           </div>
         </div>
         <div class="tc-actions">
-          <button class="icon-btn" data-act="logs" title="查看日志" aria-label="查看日志">${icon('terminal')}</button>
           <label class="switch" data-act="toggle" title="${active ? '关闭隧道' : '开启隧道'}">
-            <input type="checkbox" data-role="toggle" ${active ? 'checked' : ''}>
+            <input type="checkbox" data-role="toggle" aria-label="${esc(t.name)}：开关" ${active ? 'checked' : ''}>
             <span class="switch-track"><span class="switch-thumb"></span></span>
           </label>
         </div>
@@ -609,25 +611,20 @@
           <span class="endpoint-value" title="经 ${esc(server.host || '')} → ${esc(t.remoteHost || '127.0.0.1')}:${t.remotePort}">${esc(t.remoteHost || '127.0.0.1')}:${t.remotePort}</span>
         </div>
       </div>
-      <div class="tc-meta">
-        <span>PID <b data-live="pid">${pid}</b></span><span>·</span>
-        <span>延迟 <b data-live="latency">${latency}</b></span><span>·</span>
-        <span>在线 <span data-live="uptime">${uptime}</span></span>
-        <span>·</span>
-        <span>${PROBE_TEXT[t.effectiveProbe] || '自动'}</span>
+      <div class="tc-stats">
+        <div class="tc-stat"><span>延迟</span><b data-live="latency">${latency}</b></div>
+        <div class="tc-stat"><span>在线</span><b data-live="uptime">${uptime}</b></div>
+        <div class="tc-stat"><span>进程</span><b data-live="pid">${pid}</b></div>
       </div>
       <div class="tc-error" data-live="error" ${error ? '' : 'hidden'}>${error}</div>
       <div class="tc-foot">
-        <svg class="tc-spark" viewBox="0 0 92 26" preserveAspectRatio="none" aria-hidden="true">
+        ${hasSpark ? `<svg class="tc-spark" viewBox="0 0 92 26" preserveAspectRatio="none" aria-hidden="true">
           <path class="spark-area" d="${areaPath(points, 26)}" fill="currentColor" opacity=".1"/>
           <path class="spark-line" data-live="spark" d="${linePath(points)}"/>
-        </svg>
-        <div class="tc-quick">
-          ${url ? `<button class="quick-btn accent" data-act="open-url">${icon('external')}打开</button>` : ''}
-          ${url ? `<button class="quick-btn" data-act="connection" title="查看连接信息与后端地址" aria-label="连接信息">${icon('info')}</button>` : ''}
-          <button class="quick-btn" data-act="port" title="端口诊断：查看占用进程" aria-label="端口诊断" ${status === 'occupied' ? '' : 'hidden'}>${icon('search')}</button>
-          <button class="quick-btn" data-act="copy">${icon('copy')}${t.kind === 'dedicated' ? '代理地址' : '复制'}</button>
-          <button class="quick-btn" data-act="menu">${icon('more')}更多</button>
+        </svg>` : ''}
+        <div class="tc-foot-actions">
+          ${url ? `<button class="tc-action accent" data-act="open-url" title="在浏览器中打开面板">${icon('external')}<span>打开面板</span></button>` : ''}
+          <button class="tc-more" data-act="menu" aria-haspopup="menu" aria-expanded="false" title="更多操作" aria-label="${esc(t.name)}：更多操作">${icon('more')}</button>
         </div>
       </div>
     </article>`;
@@ -683,6 +680,7 @@
       const status = state.status || 'offline';
       const server = t.server || S.servers.find((x) => x.id === t.serverId) || {};
       const latency = state.latency;
+      const active = status === 'online' || status === 'connecting' || (status === 'error' && state.pid != null);
       return `<div class="tunnel-table t-row" data-row-id="${esc(t.id)}" data-status="${status}" data-group="${esc(t.group || '')}" tabindex="0">
         <label class="checkline" data-no-open>
           <input type="checkbox" data-select="${esc(t.id)}" ${S.selection.has(t.id) ? 'checked' : ''} aria-label="选择 ${esc(t.name)}">
@@ -702,12 +700,11 @@
         <div class="t-latency ${latencyClass(latency)}" data-live="latency">${latency != null ? latency + ' ms' : '—'}</div>
         <div><span class="status-label" data-status="${status}" data-live="status">${statusText(status)}</span></div>
         <div class="t-actions">
-          <label class="switch" data-act="toggle" title="${status === 'online' || status === 'connecting' || (status === 'error' && state.pid != null) ? '关闭隧道' : '开启隧道'}">
-            <input type="checkbox" data-role="toggle" ${status === 'online' || status === 'connecting' || (status === 'error' && state.pid != null) ? 'checked' : ''}>
+          <label class="switch" data-act="toggle" title="${active ? '关闭隧道' : '开启隧道'}">
+            <input type="checkbox" data-role="toggle" aria-label="${esc(t.name)}：开关" ${active ? 'checked' : ''}>
             <span class="switch-track"><span class="switch-thumb"></span></span>
           </label>
-          <button class="icon-btn" data-act="logs" title="日志">${icon('terminal')}</button>
-          <button class="icon-btn" data-act="edit" title="编辑">${icon('edit')}</button>
+          <button class="wb-more" data-act="menu" aria-haspopup="menu" aria-expanded="false" title="更多操作" aria-label="${esc(t.name)}：更多操作">${icon('more')}</button>
         </div>
       </div>`;
     }).join('');
@@ -985,15 +982,16 @@
       const uptime = card.querySelector('[data-live="uptime"]');
       if (uptime) uptime.textContent = isOnline ? fmtDuration(state.uptimeSec) : '—';
       const err = card.querySelector('[data-live="error"]');
-      const portButton = card.querySelector('[data-act="port"]');
-      if (portButton) portButton.hidden = status !== 'occupied';
       if (err) {
         if (state.error) { err.hidden = false; err.textContent = state.error; err.title = state.error; }
         else { err.hidden = true; err.textContent = ''; }
       }
+      if (card.classList.contains('wb-list-row')) card.title = state.error || '';
       const toggle = card.querySelector('[data-role="toggle"]');
-      if (toggle && !toggle.closest('.switch').classList.contains('is-busy')) {
-        toggle.checked = isActive;
+      if (toggle) {
+        const scope = toggle.closest('.switch');
+        if (!scope?.classList.contains('is-busy')) toggle.checked = isActive;
+        scope?.setAttribute('title', isActive ? '关闭隧道' : '开启隧道');
       }
       const spark = card.querySelector('[data-live="spark"]');
       if (spark) {
@@ -1005,8 +1003,6 @@
       }
       const header = card.querySelector('.tc-actions .switch');
       if (header) header.title = isActive ? '关闭隧道' : '开启隧道';
-      const logsBtn = card.querySelector('[data-act="logs"]');
-      if (logsBtn) logsBtn.setAttribute('title', isOnline ? '查看运行日志' : '查看历史日志');
     });
     applyOverviewFilter();
   }
@@ -1065,6 +1061,7 @@
   function openDrawer(id, tab = 'overview') {
     const t = S.tunnels.find((x) => x.id === id);
     if (!t) return;
+    TunnelWorkbench.closeMenu?.();
     clearTimeout(drawerCloseTimer);
     clearTimeout(drawerFocusTimer);
     if (drawerFrame) cancelAnimationFrame(drawerFrame);
@@ -2680,6 +2677,7 @@
     return Object.prototype.hasOwnProperty.call(VIEW_META, hash) ? hash : 'overview';
   }
   function setView(view, { silent = false } = {}) {
+    TunnelWorkbench.closeMenu?.();
     const next = Object.prototype.hasOwnProperty.call(VIEW_META, view) ? view : 'overview';
     S.view = next;
     $$('.view').forEach((section) => {
@@ -2823,10 +2821,10 @@
       if (!btn) return;
       const row = btn.closest('.t-row');
       if (!row) return;
+      if (btn.dataset.act === 'toggle') return;
       event.stopPropagation();
-      const id = row.dataset.rowId;
-      if (btn.dataset.act === 'logs') { setView('logs'); S.logs.source = id; renderLogSources(); resetLogs(); loadLogs(true); }
-      if (btn.dataset.act === 'edit') { const t = S.tunnels.find((x) => x.id === id); if (t) openTunnelModal(t); }
+      if (btn.dataset.act === 'menu') openTunnelMenu(btn, row.dataset.rowId);
+      else runTunnelAction(btn.dataset.act, row.dataset.rowId);
     });
     $('#tunnelTableBody')?.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && event.target.classList.contains('t-row')) openDrawer(event.target.dataset.rowId);
@@ -3027,38 +3025,46 @@
     const id = card.dataset.id;
     const actBtn = event.target.closest('[data-act]');
     if (actBtn) {
-      event.stopPropagation();
       const act = actBtn.dataset.act;
-      if (act === 'logs') {
-        setView('logs');
-        S.logs.source = id;
-        renderLogSources();
-        resetLogs();
-        loadLogs(true);
-      } else if (act === 'edit') {
-        const t = S.tunnels.find((x) => x.id === id);
-        if (t) openTunnelModal(t);
-      } else if (act === 'open-url') {
-        const t = S.tunnels.find((x) => x.id === id);
-        if (t) openTunnelPanel(t);
-      } else if (act === 'connection') {
-        const t = S.tunnels.find((x) => x.id === id);
-        if (t) showTunnelConnection(t);
-      } else if (act === 'port') {
-        const t = S.tunnels.find((x) => x.id === id);
-        if (t) showPortDiagnosis(t);
-      } else if (act === 'copy') {
-        const t = S.tunnels.find((x) => x.id === id);
-        if (t) { if (t.kind === 'dedicated') copyText(`http://127.0.0.1:${t.localPort}`, '已复制代理地址'); else copyLocal(t); }
-      } else if (act === 'menu') {
-        openDrawer(id, 'settings');
-      } else if (act === 'toggle') {
-        // handled by change event; ignore click
-      }
+      // 开关由 change 事件处理，点击本身只切换 UI。
+      if (act === 'toggle') return;
+      event.stopPropagation();
+      if (act === 'menu') openTunnelMenu(actBtn, id);
+      else runTunnelAction(act, id);
       return;
     }
     if (event.target.closest('input, label')) return;
     openDrawer(id);
+  }
+
+  /* 卡片、列表行与表格行共用同一套动作，按钮只负责唤起。 */
+  function tunnelIsActive(t) {
+    const state = (t && S.runtime[t.id]) || {};
+    const status = state.status || 'offline';
+    return status === 'online' || status === 'connecting' || (status === 'error' && state.pid != null);
+  }
+
+  function openTunnelMenu(anchor, id) {
+    const t = S.tunnels.find((x) => x.id === id);
+    if (!t) return;
+    const items = TunnelWorkbench.menuItems(t, { active: tunnelIsActive(t) });
+    TunnelWorkbench.openMenu(anchor, items, (act) => runTunnelAction(act, id));
+  }
+
+  function runTunnelAction(act, id) {
+    const t = S.tunnels.find((x) => x.id === id);
+    if (!t) return;
+    if (act === 'logs') { setView('logs'); S.logs.source = id; renderLogSources(); resetLogs(); loadLogs(true); }
+    else if (act === 'edit') openTunnelModal(t);
+    else if (act === 'open-url') openTunnelPanel(t);
+    else if (act === 'connection') showTunnelConnection(t);
+    else if (act === 'port') showPortDiagnosis(t);
+    else if (act === 'restart') restartTunnel(id);
+    else if (act === 'delete') deleteTunnel(id);
+    else if (act === 'copy') {
+      if (t.kind === 'dedicated') copyText(`http://127.0.0.1:${t.localPort}`, '已复制代理地址');
+      else copyLocal(t);
+    }
   }
 
   async function deleteServer(id) {
