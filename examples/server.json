@@ -1,0 +1,8 @@
+{
+  "name": "demo",
+  "host": "192.0.2.10",
+  "port": 22,
+  "user": "alice",
+  "note": "Documentation example; replace host and user before use",
+  "color": "ocean"
+}

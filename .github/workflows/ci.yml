@@ -1,0 +1,49 @@
+name: Cross-platform checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check shared assets and publishable source
+        run: |
+          node scripts/sync-shared.mjs
+          node scripts/audit-repository.mjs
+      - name: Test Node backend, CLI, shortcuts and sync
+        run: node --test portable/TunnelStudio/tests/*.test.mjs tests/sync.test.mjs
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check shared assets and publishable source
+        shell: pwsh
+        run: |
+          node scripts/sync-shared.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/audit-repository.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Windows PowerShell 5.1 HTTP receiver tests
+        shell: cmd
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\http.tests.ps1
+      - name: Windows PowerShell 5.1 port ownership tests
+        shell: cmd
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\ports.tests.ps1
+      - name: Windows shortcuts and API security tests
+        shell: cmd
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-integration.tests.ps1
+      - name: Shared CLI against isolated Windows backend
+        shell: cmd
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-api.tests.ps1

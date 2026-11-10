@@ -1,0 +1,49 @@
+# OS metadata
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+
+# Local configuration, credentials and process records (never publish)
+/ServerTunnels.json
+/ServerTunnels.json.bak
+/Panel/*.json
+/Panel/*.json.*
+/Panel/logs/
+/Panel/backups/
+/Panel/sync/
+/Panel/ssh/
+**/data/
+**/.ssh/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+known_hosts*
+
+# Historical backups, private screenshots and local reports
+/backups/
+/reports/
+/Panel/screenshots/
+/Panel/preview-overview.png
+/test.yaml
+/mac_patch.py
+/ServerTunnelManager-Guide.md
+
+# Generated apps, dependencies and test scratch directories
+node_modules/
+*.app/
+/build/
+/dist/
+macos/build/
+macos/dist/
+**/__pycache__/
+*.pyc
+*.log
+*.pid
+**/run-*/
+.coverage
+coverage/
