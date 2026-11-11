@@ -599,6 +599,7 @@ function Update-Tunnel([string]$id, $body) {
     foreach ($key in $input.Keys) { $tunnel[$key] = $input[$key] }
     $tunnel.updatedAt = To-Iso (NowUtc)
     Save-Config
+    if ($tunnel.kind -eq 'dedicated') { Sync-EdgeProfilesForTunnel $tunnel }
     Add-Log info 'panel' "更新隧道「$($tunnel.name)」"
     Add-Activity -Kind 'info' -Title '修改隧道' -Detail "$($tunnel.name) · 配置已更新" -TunnelId $id
     if ($wasOnline) {
@@ -1520,6 +1521,7 @@ function Get-TunnelsSnapshot {
 }
 
 function Get-Bootstrap {
+    $browserStatus = Get-EdgeProfileStatus
     return [ordered]@{
         ok       = $true
         app      = $script:AppName
@@ -1529,6 +1531,8 @@ function Get-Bootstrap {
         settings = $script:Config.settings
         servers  = @(Get-ServersSnapshot)
         tunnels  = @(Get-TunnelsSnapshot)
+        browserProfiles = $browserStatus.profiles
+        browserProfileSupport = $browserStatus
         runtime  = Get-RuntimeSnapshot
         metrics  = Get-Metrics
         activity = @(Get-ActivitySnapshot 50)

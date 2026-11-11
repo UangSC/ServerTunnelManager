@@ -107,7 +107,7 @@ try {
     New-Item -ItemType Directory -Path $guardDir -Force | Out-Null
     # Never copy directories or wildcard Panel/*: those can include live
     # config/runtime/key material. Only these source files are test inputs.
-    foreach ($name in @('Core.ps1', 'Server.ps1', 'Extras.ps1', 'Ports.ps1', 'Sync.ps1', 'Dsh.ps1', 'Http.ps1', 'Shortcuts.ps1', 'ApiClient.ps1')) {
+    foreach ($name in @('Core.ps1', 'Server.ps1', 'Extras.ps1', 'Ports.ps1', 'Sync.ps1', 'Dsh.ps1', 'Http.ps1', 'Shortcuts.ps1', 'Edge.ps1', 'ApiClient.ps1')) {
         Copy-Item -LiteralPath (Join-Path (Join-Path $sourceRoot 'Panel') $name) -Destination (Join-Path $panelDir $name)
     }
     foreach ($name in @('Start-Panel.ps1', 'Stop-Panel.ps1')) {
@@ -208,6 +208,13 @@ public static class WindowsApiSshSentinel {
     $localPort = Get-FreeLoopbackPort
     while ($localPort -eq $port) { $localPort = Get-FreeLoopbackPort }
     $tunnel = (Invoke-TestCli -arguments @('tunnel', 'add', '--name', '临时一', '--server-id', $server.id, '--local-port', [string]$localPort, '--remote-port', '8080', '--probe', 'none', '--auto-open', 'false', '--kind', 'dedicated', '--proxy-account', 'example', '--isp-id', 'ISP-01', '--proxy-exit-ip', '203.0.113.10', '--proxy-route', 'direct')).tunnel
+    $profile = (Invoke-TestCli -arguments @('browser-profile', 'add', '--name', '出口示例', '--tunnel-id', $tunnel.id)).profile
+    Assert-Api ($profile.name -eq '出口示例' -and $profile.tunnelId -eq $tunnel.id) '共享CLI创建Edge配置记录'
+    Assert-Api ((Invoke-TestCli -arguments @('browser-profile', 'list')).profiles.Count -eq 1) '共享CLI读取Edge配置列表'
+    Invoke-TestCli -arguments @('browser-profile', 'update', $profile.id, '--name', '出口已改名') | Out-Null
+    Assert-Api ((Invoke-TestCli -arguments @('browser-profile', 'get', $profile.id)).profile.name -eq '出口已改名') '共享CLI更新Edge配置名称'
+    Invoke-TestCli -arguments @('browser-profile', 'apply', $profile.id) | Out-Null
+    Assert-Api ((Invoke-TestCli -arguments @('browser-profile', 'get', $profile.id)).profile.pending -eq $false) '演示模式应用Edge代理配置'
     $otherPort = Get-FreeLoopbackPort
     while ($otherPort -in @($port, $localPort)) { $otherPort = Get-FreeLoopbackPort }
     $other = (Invoke-TestCli -arguments @('tunnel', 'add', '--name', '临时二', '--server-id', $server.id, '--local-port', [string]$otherPort, '--remote-port', '8081', '--probe', 'none', '--auto-open', 'false')).tunnel

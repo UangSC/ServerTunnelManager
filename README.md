@@ -56,6 +56,25 @@ Finder 也可双击 [Start.command](<Start.command>)、[Stop.command](<Stop.comm
 
 Windows 使用当前 Git 工作副本中的脚本。更新后重启面板即可加载新代码。Windows 停止/重启面板**保留已登记的 SSH 隧道**，下次启动只在核实 PID、创建时间和完整转发规则后恢复管理；如需完全断开，先调用 CLI `batch close --all` 再停止面板。不会接管或结束其他项目/手动 SSH 进程。
 
+### Windows Edge 浏览器配置
+
+Windows 面板的“Edge 配置”页面可以为专用隧道建立本机 Profile 记录。名称默认使用隧道的出口 IP；保存记录不会立刻覆盖 Edge 文件，关闭 Edge 后点击“应用”才会写入 Profile 的代理端口和名称。点击“打开”时若有待应用修改，会先检查 Edge 是否已退出；配置已应用时可以直接打开。Profile、Cookie、扩展和本机路径不进入配置同步或导出；“移除记录”只移除 Tunnel Studio 的绑定记录，不删除 Edge 数据。
+
+停用管理、解除绑定或移除记录都保留已有代理设置；这些操作不会把浏览器改为直连。打开 Profile 前请先开启相应专用隧道。隧道端口修改时，Edge 已关闭则自动应用，仍运行则显示“等待应用”。应用前会将原文件备份至 `Panel/backups/edge-*`。
+
+首次读取会接管匹配的已有配置；页面也可以扫描已有配置，但只接管明确使用 `127.0.0.1:<专用隧道端口>` 的 Profile。面板运行在演示模式时，操作只写入项目内的演示目录，不会启动真实浏览器。
+
+CLI 对应命令（仅 Windows 后端提供真实 Edge 操作）：
+
+```sh
+node bin/tunnel.mjs browser-profile list
+node bin/tunnel.mjs browser-profile add --tunnel-id t-REPLACE --name "日本出口"
+node bin/tunnel.mjs browser-profile update bp-REPLACE --name "日本出口-备用"
+node bin/tunnel.mjs browser-profile apply bp-REPLACE
+node bin/tunnel.mjs browser-profile open bp-REPLACE
+node bin/tunnel.mjs browser-profile delete bp-REPLACE --yes
+```
+
 ## 2. 应用程序快捷图标
 
 网页 **设置 → 启动与自动化 → 应用程序快捷图标**，与“登录自启”“自动开启隧道”是三个独立功能：
@@ -97,7 +116,7 @@ macOS 登录自启需完整原生应用，可能需要系统设置中允许登�
 
 ## 3. CLI：适合 AI 的首选入口
 
-共享客户端位于 [CLI 实现](<portable/TunnelStudio/bin/tunnel.mjs>)，仓库入口为 [tunnel.mjs](<bin/tunnel.mjs>)。**Windows 和 macOS 使用相同命令**，需要 Node.js 22+，不需要 npm install；CLI 不打开浏览器，也不会自动输入 SSH 密码或授权未知主机。
+共享客户端位于 [CLI 实现](<portable/TunnelStudio/bin/tunnel.mjs>)，仓库入口为 [tunnel.mjs](<bin/tunnel.mjs>)。**Windows 和 macOS 使用相同命令**，需要 Node.js 22+，不需要 npm install；仅显式调用 `browser-profile open` 会打开浏览器；CLI 不会自动输入 SSH 密码或授权未知主机。
 
 ```sh
 node bin/tunnel.mjs --help
@@ -222,6 +241,10 @@ node bin/tunnel.mjs api POST /api/batch --json '{"action":"close","ids":["t-REPL
 | --- | --- | --- |
 | GET | `/api/health` | 无令牌；运行版本、PID、实际端口 |
 | GET | `/api/bootstrap` | 完整 UI 初始化数据；原始响应含 token，CLI 会去除 token |
+| GET/POST | `/api/browser-profiles` | Windows 本机 Edge 配置列表/创建；macOS 返回不支持 |
+| GET/PATCH/DELETE | `/api/browser-profiles/:id` | 读取、保存或移除 Edge 配置记录 |
+| POST | `/api/browser-profiles/discover` | 显式扫描并接管已有本机代理 Profile |
+| POST | `/api/browser-profiles/:id/apply` / `/api/browser-profiles/:id/open` | 关闭 Edge 后应用配置，或应用后打开 Profile |
 | GET | `/api/state` | `runtime`、服务器状态、指标、活动、启动/快捷入口状态 |
 | GET | `/api/servers` / `/api/servers/{id}` | `{ok,servers}` / `{ok,server}` |
 | POST | `/api/servers` | 新增，返回 `{ok,server}` |

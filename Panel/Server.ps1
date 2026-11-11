@@ -25,6 +25,7 @@ $script:PanelDir = $PSScriptRoot
 . (Join-Path $script:PanelDir 'Sync.ps1')
 . (Join-Path $script:PanelDir 'Http.ps1')
 . (Join-Path $script:PanelDir 'Shortcuts.ps1')
+. (Join-Path $script:PanelDir 'Edge.ps1')
 
 # ------------------------------------------------------------
 #  HTTP response helpers
@@ -483,6 +484,37 @@ function Invoke-ApiRoute($request) {
 
     if ($method -eq 'GET' -and $path -eq '/api/tunnels') {
         return [ordered]@{ ok = $true; tunnels = @(Get-TunnelsSnapshot) }
+    }
+    if ($method -eq 'GET' -and $path -eq '/api/browser-profiles') {
+        $status = Get-EdgeProfileStatus
+        if ($status.error) { throw $status.error }
+        return [ordered]@{ ok = $true; supported = $true; running = $status.running; simulation = $status.simulation; profiles = $status.profiles }
+    }
+    if ($method -eq 'POST' -and $path -eq '/api/browser-profiles/discover') {
+        Import-EdgeProfiles | Out-Null
+        return [ordered]@{ ok = $true; profiles = @(Get-EdgeProfiles) }
+    }
+    if ($method -eq 'POST' -and $path -eq '/api/browser-profiles') {
+        $body = & $getBody
+        return [ordered]@{ ok = $true; profile = (Add-EdgeProfile $body) }
+    }
+    if ($path -match '^/api/browser-profiles/([^/]+)$' -and $method -in @('PATCH', 'PUT')) {
+        $id = $matches[1]
+        $body = & $getBody
+        return [ordered]@{ ok = $true; profile = (Update-EdgeProfile $id $body) }
+    }
+    if ($path -match '^/api/browser-profiles/([^/]+)$' -and $method -eq 'GET') {
+        $record = Get-EdgeProfile $matches[1]
+        return [ordered]@{ ok = $true; profile = (@(Get-EdgeProfiles | Where-Object { $_.id -eq $record.id })[0]) }
+    }
+    if ($path -match '^/api/browser-profiles/([^/]+)/apply$' -and $method -eq 'POST') {
+        return [ordered]@{ ok = $true; profile = (Apply-EdgeProfile $matches[1]) }
+    }
+    if ($path -match '^/api/browser-profiles/([^/]+)$' -and $method -eq 'DELETE') {
+        return [ordered]@{ ok = $true; id = (Remove-EdgeProfile $matches[1]).id }
+    }
+    if ($path -match '^/api/browser-profiles/([^/]+)/open$' -and $method -eq 'POST') {
+        return [ordered]@{ ok = $true; profile = (Open-EdgeProfile $matches[1]) }
     }
     if ($method -eq 'GET' -and $path -match '^/api/tunnels/([^/]+)$') {
         $id = $matches[1]

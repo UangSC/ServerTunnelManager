@@ -75,6 +75,9 @@ jobs:
             Write-Host "::error file=tests/windows-api.tests.ps1::$detail"
             exit 1
           }
+      - name: Edge profile isolation and persistence
+        shell: pwsh
+        run: ./tests/edge.tests.ps1
       - name: Windows PowerShell 7 sync worker
         shell: pwsh
         run: |

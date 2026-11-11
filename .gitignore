@@ -13,6 +13,7 @@ Desktop.ini
 /Panel/*.json.*
 /Panel/logs/
 /Panel/backups/
+/Panel/edge-simulation/
 /Panel/sync/
 /Panel/ssh/
 **/data/
@@ -44,6 +45,11 @@ macos/build/
 macos/dist/
 **/__pycache__/
 *.pyc
+**/.pytest_cache/
+**/.cache/
+*.tmp
+*.swp
+*.swo
 *.log
 *.pid
 **/run-*/

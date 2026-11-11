@@ -1586,3 +1586,12 @@ html[data-theme="dark"] .layout-switch button.is-active { background: rgba(255, 
   .layout-switch button, .tunnel-card.wb-list-row { transition: none; }
   .wb-menu { animation: none; }
 }
+.edge-profile-panel { border: 1px solid var(--border-soft); border-radius: 16px; background: var(--panel); padding: 20px; }
+.edge-profile-toolbar, .edge-profile-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.edge-profile-toolbar p, .edge-profile-status { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.edge-profile-status { margin: 16px 0; }
+.edge-profile-row { padding: 18px 0; border-top: 1px solid var(--border-soft); }
+.edge-profile-info { display: grid; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.edge-profile-info strong { font-size: 15px; }
+.edge-profile-info span { color: var(--muted); font-size: 12px; }
+.edge-profile-actions { display: flex; gap: 6px; flex-wrap: wrap; }

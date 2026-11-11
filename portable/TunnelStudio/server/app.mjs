@@ -161,6 +161,7 @@ export class Panel{
         avgLatency:latencies.length?Math.round(latencies.reduce((v,n)=>v+n,0)/latencies.length):0,rate:0,traffic:{in:0,out:0,total:0},history:this.history,
         uptimeSec:Math.floor((Date.now()-this.started)/1000),startedAt:new Date(this.started).toISOString()}};
     if(bootstrap)Object.assign(result,{app:'Tunnel Studio',version:VERSION,token:this.token,settings:this.config.settings,
+      browserProfiles:[],browserProfileSupport:{supported:false,profiles:[],error:'Edge 配置管理目前仅支持 Windows。'},
       tunnels:this.config.tunnels.map(t=>({...t,server:this.server(t.serverId),url:t.openUrl,effectiveProbe:effectiveProbe(t)})),
       env:{platform:platformName+' '+os.release()+' · '+os.arch(),runtime:'Node.js '+process.versions.node,ssh:'/usr/bin/ssh',sshAvailable:result.sshAvailable,panelPort:this.port,
         dataPath:confined(this.root,'data/config.json'),logsPath:confined(this.root,'data/logs'),rootPath:this.root,demo:this.config.settings.simulation,realSshEnabled:this.enableSsh,trafficAvailable:false,workspaceRestricted:true},
@@ -225,6 +226,8 @@ export class Panel{
     const config=this.config;
     if(method==='GET'&&pathname==='/api/settings')return {ok:true,settings:structuredClone(config.settings),autostart:this.autostart(),applicationShortcut:this.shortcuts.status()};
     if(method==='GET'&&pathname==='/api/bootstrap')return this.snapshot(true);
+    if(method==='GET'&&pathname==='/api/browser-profiles')return {ok:true,supported:false,profiles:[],error:'Edge 配置管理目前仅支持 Windows。'};
+    if(pathname==='/api/browser-profiles'||pathname.startsWith('/api/browser-profiles/'))fail('Edge 配置管理目前仅支持 Windows。');
     if(method==='GET'&&pathname==='/api/state')return this.snapshot();
     if(method==='GET'&&pathname==='/api/logs')return {ok:true,lines:this.logs.filter(l=>l.id>Number(query.get('since')||0)&&(!query.get('source')||query.get('source')==='all'||l.source===query.get('source'))).slice(-Math.min(1000,Math.max(20,Number(query.get('limit'))||300))),lastId:this.counter};
     if(method==='POST'&&pathname==='/api/logs/clear'){this.logs=[];this.log('info','panel','内存日志已清空。');return {ok:true};}

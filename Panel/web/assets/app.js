@@ -203,6 +203,7 @@
     settings: {},
     servers: [],
     tunnels: [],
+    browserProfiles: [],
     runtime: {},
     metrics: {},
     activity: [],
@@ -378,6 +379,8 @@
     S.settings = data.settings || {};
     S.servers = data.servers || [];
     S.tunnels = data.tunnels || [];
+    S.browserProfiles = data.browserProfiles || [];
+    S.browserProfileSupport = data.browserProfileSupport || {};
     S.runtime = data.runtime || {};
     S.metrics = data.metrics || {};
     S.activity = data.activity || [];
@@ -415,6 +418,7 @@
     overview: { title: '总览', crumb: '总览' },
     tunnels: { title: '隧道', crumb: '隧道' },
     dedicated: { title: '专用隧道', crumb: '专用隧道' },
+    edge: { title: 'Edge 配置', crumb: 'Edge 配置' },
     servers: { title: '服务器', crumb: '服务器' },
     logs: { title: '运行日志', crumb: '运行日志' },
     access: { title: '免密登录', crumb: '免密登录' },
@@ -426,6 +430,7 @@
     renderOverview();
     renderTunnelGrid();
     renderTunnelsTable();
+    renderEdgeProfiles();
     renderServerGrid();
     renderServerMini();
     renderNav();
@@ -455,6 +460,7 @@
     $('#navOnlineBadge').textContent = online;
     $('#navTunnelCount').textContent = S.tunnels.filter(t => t.kind !== 'dedicated').length;
     $('#navDedicatedCount').textContent = S.tunnels.filter(t => t.kind === 'dedicated').length;
+    $('#navEdgeCount').textContent = S.browserProfiles.length;
     $('#navServerCount').textContent = S.servers.length;
     const first = S.servers[0];
     if (first) {
@@ -493,6 +499,63 @@
         ? '演示模式只模拟状态流转、延迟与流量，不会启动任何 SSH 进程。'
         : '真实模式会调用本机 ssh.exe。请确认密钥与服务器指纹已配置，避免误杀其他 SSH 会话。';
     }
+  }
+
+  function renderEdgeProfiles() {
+    const root = $('#edgeProfileList');
+    if (!root) return;
+    const support = S.browserProfileSupport || {};
+    $('#edgeProfileStatus').textContent = support.error || (support.simulation ? '演示模式：仅操作演示文件，不启动真实 Edge。' : support.running ? 'Edge 正在运行：可保存修改，关闭所有窗口及后台进程后再应用。' : '可以应用配置。打开前请先开启对应专用隧道。');
+    if (!S.browserProfiles.length) {
+      root.innerHTML = '<div class="empty-state"><h3>还没有 Edge 配置</h3><p>新建配置，或扫描已有的本机代理 Profile。</p></div>';
+      return;
+    }
+    root.innerHTML = S.browserProfiles.map((p) => {
+      const t = p.tunnel;
+      const status = !p.enabled ? '已停用管理' : !t ? '未绑定有效隧道' : p.pending ? '等待应用' : '已应用';
+      return `<article class="edge-profile-row" data-edge-id="${esc(p.id)}"><div class="edge-profile-info"><strong>${esc(p.name)}</strong><span>${esc(p.profileDirectory)} · ${esc(status)}</span><span>${t ? `${esc(t.ispId || '')} · ${esc(t.proxyExitIp || '')} · 127.0.0.1:${esc(t.localPort)}` : '保留现有浏览器数据和代理设置'}</span>${p.error ? `<span class="text-danger">${esc(p.error)}</span>` : ''}</div><div class="edge-profile-actions"><button class="btn btn-soft" data-edge-act="open" ${!p.enabled || !t || support.simulation ? 'disabled' : ''}>打开</button><button class="btn btn-soft" data-edge-act="apply" ${!p.enabled || !t || support.running ? 'disabled' : ''}>应用</button><button class="btn btn-ghost" data-edge-act="edit">编辑</button><button class="btn btn-ghost" data-edge-act="delete">移除记录</button></div></article>`;
+    }).join('');
+  }
+
+  function openEdgeProfileModal(profile = null) {
+    const isEdit = !!profile;
+    const dedicated = S.tunnels.filter((t) => t.kind === 'dedicated');
+    if (!dedicated.length && !isEdit) { toast('warning', '没有专用隧道', '请先创建一条专用隧道。'); return; }
+    const selected = profile?.tunnelId || (!isEdit ? dedicated[0]?.id : '');
+    const body = `<form class="modal-form" id="edgeProfileForm"><label class="field"><span>Profile 名称</span><input name="name" value="${esc(profile?.name || '')}" placeholder="留空使用出口 IP" maxlength="80"></label><label class="field"><span>绑定专用隧道</span><select name="tunnelId">${isEdit ? '<option value="">解除绑定（保留现有代理）</option>' : ''}${dedicated.map((t) => `<option value="${esc(t.id)}" ${t.id === selected ? 'selected' : ''}>${esc(t.name)} · ${esc(t.proxyExitIp || '未填写')} · 127.0.0.1:${esc(t.localPort)}</option>`).join('')}</select></label><label class="field"><span>管理状态</span><select name="enabled"><option value="true" ${profile?.enabled !== false ? 'selected' : ''}>启用管理</option><option value="false" ${profile?.enabled === false ? 'selected' : ''}>停用管理（保留现有代理）</option></select></label><div class="form-error" id="edgeProfileFormError" hidden></div></form>`;
+    openModal({ title: isEdit ? '编辑 Edge 配置' : '新建 Edge 配置', subtitle: '保存后点击应用或打开，将名称和绑定写入 Edge。', body, footer: '<button class="btn btn-ghost" data-modal-cancel>取消</button><button class="btn btn-primary" id="edgeProfileSubmit">保存</button>', onMount(root, close) {
+      $('[data-modal-cancel]', root).addEventListener('click', close);
+      const form = $('#edgeProfileForm', root);
+      const submit = async (event) => {
+        event.preventDefault();
+        const button = $('#edgeProfileSubmit', root);
+        if (button.disabled) return;
+        button.disabled = true;
+        const fields = form.elements;
+        const name = fields.namedItem('name').value.trim();
+        try {
+          await api(isEdit ? `/api/browser-profiles/${encodeURIComponent(profile.id)}` : '/api/browser-profiles', { method: isEdit ? 'PATCH' : 'POST', body: { name, tunnelId: fields.namedItem('tunnelId').value, enabled: fields.namedItem('enabled').value === 'true' } });
+          close(); await reloadBootstrap(); toast('success', '配置已保存', '关闭 Edge 后点击应用，或点击打开。');
+        } catch (error) { showFormError('edgeProfileFormError', error.message); }
+        finally { button.disabled = false; }
+      };
+      form.addEventListener('submit', submit);
+      $('#edgeProfileSubmit', root).addEventListener('click', submit);
+    }});
+  }
+
+  async function runEdgeProfileAction(action, id) {
+    const profile = S.browserProfiles.find((p) => p.id === id); if (!profile) return;
+    try {
+      if (action === 'edit') return openEdgeProfileModal(profile);
+      if (action === 'open' || action === 'apply') await api(`/api/browser-profiles/${encodeURIComponent(id)}/${action}`, { method: 'POST' });
+      if (action === 'delete') {
+        if (!await confirmAction({ title: '移除 Edge 配置记录', message: `确定移除「${profile.name}」吗？`, detail: '不会删除 Edge Profile、Cookie、扩展或现有代理设置。', confirmText: '移除', danger: true })) return;
+        await api(`/api/browser-profiles/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      }
+      await reloadBootstrap();
+      toast('success', action === 'open' ? '已打开 Edge' : action === 'apply' ? '配置已应用' : '记录已移除', profile.name);
+    } catch (error) { toast('error', 'Edge 操作失败', error.message); }
   }
 
   /* ------------------------------------------------------------
@@ -2302,7 +2365,7 @@
      Command palette
      ------------------------------------------------------------ */
   const NAV_ITEMS = [
-    ['overview', '总览', 'grid'], ['tunnels', '隧道', 'route'], ['servers', '服务器', 'server'],
+    ['overview', '总览', 'grid'], ['tunnels', '隧道', 'route'], ['dedicated', '专用隧道', 'shield'], ['edge', 'Edge 配置', 'globe'], ['servers', '服务器', 'server'],
     ['logs', '运行日志', 'terminal'], ['access', '免密登录', 'key'], ['settings', '设置', 'settings']
   ];
 
@@ -2845,6 +2908,17 @@
     $('#btnNewTunnelPage')?.addEventListener('click', () => openTunnelModal());
     $$('#tunnelTableEmpty [data-action="new-tunnel"]').forEach((btn) => btn.addEventListener('click', () => openTunnelModal()));
     $('#btnNewServer')?.addEventListener('click', () => openServerModal());
+    $('#btnRefreshEdgeProfiles')?.addEventListener('click', () => reloadBootstrap().catch((error) => toast('error', '刷新失败', error.message)));
+    $('#btnDiscoverEdgeProfiles')?.addEventListener('click', async () => {
+      try { await api('/api/browser-profiles/discover', { method: 'POST' }); await reloadBootstrap(); toast('success', '扫描完成', '已接管匹配本机专用隧道的 Edge Profile。'); }
+      catch (error) { toast('error', '扫描失败', error.message); }
+    });
+    $('#btnNewEdgeProfile')?.addEventListener('click', () => openEdgeProfileModal());
+    $('#edgeProfileList')?.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-edge-act]');
+      const row = event.target.closest('[data-edge-id]');
+      if (button && row) runEdgeProfileAction(button.dataset.edgeAct, row.dataset.edgeId);
+    });
     $('#btnNewServer2')?.addEventListener('click', () => openServerModal());
     $('#btnBatchOpen')?.addEventListener('click', () => batchAction('open'));
     $('#btnBatchClose')?.addEventListener('click', () => batchAction('close'));

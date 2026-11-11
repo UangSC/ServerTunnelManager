@@ -13,7 +13,7 @@ $ast = [Management.Automation.Language.Parser]::ParseFile((Join-Path $root 'Pane
 if ($errors.Count) { throw ($errors | Out-String) }
 # Running this test under PowerShell 7.x also validates all production
 # Windows entry points with the actual 7.x parser, not only the mocked behavior.
-foreach ($relative in @('Panel/Core.ps1', 'Panel/Server.ps1', 'Panel/Http.ps1', 'Panel/Shortcuts.ps1', 'Panel/ApiClient.ps1', 'Panel/Dsh.ps1', 'Panel/Extras.ps1', 'Panel/Ports.ps1', 'Panel/Sync.ps1', 'Start-Panel.ps1', 'Stop-Panel.ps1', 'ServerTunnelManager.ps1', 'bin/api.ps1', 'bin/shortcuts.ps1')) {
+foreach ($relative in @('Panel/Core.ps1', 'Panel/Server.ps1', 'Panel/Http.ps1', 'Panel/Shortcuts.ps1', 'Panel/Edge.ps1', 'Panel/ApiClient.ps1', 'Panel/Dsh.ps1', 'Panel/Extras.ps1', 'Panel/Ports.ps1', 'Panel/Sync.ps1', 'Start-Panel.ps1', 'Stop-Panel.ps1', 'ServerTunnelManager.ps1', 'bin/api.ps1', 'bin/shortcuts.ps1')) {
     $fileTokens = $null
     $fileErrors = $null
     [void][Management.Automation.Language.Parser]::ParseFile((Join-Path $root $relative), [ref]$fileTokens, [ref]$fileErrors)

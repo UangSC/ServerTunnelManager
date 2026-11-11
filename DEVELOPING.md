@@ -48,6 +48,7 @@ pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests\http.tests.ps1
 pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests\ports.tests.ps1
 pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-integration.tests.ps1
 pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows-api.tests.ps1
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests\edge.tests.ps1
 ```
 
 测试使用独立临时目录、文档地址、模拟 SSH 或无网络 sentinel，不连接生产服务器。[Windows API 回归](<tests/windows-api.tests.ps1>) 必须针对临时实际 PowerShell 服务验证共享 Node CLI，防止两个后端的健康标识、响应结构或字段漂移。

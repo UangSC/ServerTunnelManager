@@ -13,6 +13,9 @@ Usage: node bin/tunnel.mjs [--url http://127.0.0.1:9666] COMMAND
   settings get|set
   startup status|on|off
   shortcut status|on|off
+  browser-profile list|get ID|add|update ID|delete ID|apply ID|open ID|discover
+    本机 Edge 配置（仅 Windows）；保存后用 apply 应用，delete 仅移除记录。
+    字段：--name 名称 --tunnel-id 隧道ID --enabled true|false
   export [--out FILE]
   import --file FILE --yes
   reset --yes
@@ -24,13 +27,13 @@ Examples:
   tunnel update t-ID --kind dedicated --proxy-account example --isp-id ISP-01 --proxy-exit-ip 203.0.113.10 --proxy-route direct
   settings set --simulation false --auto-open-on-launch true
 Output: JSON on stdout, errors on stderr, nonzero exit on failure.
-No browser, no automatic SSH enrollment, no token written to disk.
+Only browser-profile open launches a browser; no automatic SSH enrollment or token written to disk.
 URL may also be set with TUNNEL_STUDIO_URL; timeout with --timeout (milliseconds).
 Deleting resources, importing, resetting and batch delete require --yes.
 `;
-const fields = new Set(['name','host','port','user','keyPath','note','color','serverId','localHost','localPort','remoteHost','remotePort','probe','openUrl','group','autoOpen','kind','proxyAccount','ispId','proxyExitIp','proxyRoute',
+const fields = new Set(['tunnelId','enabled','name','host','port','user','keyPath','note','color','serverId','localHost','localPort','remoteHost','remotePort','probe','openUrl','group','autoOpen','kind','proxyAccount','ispId','proxyExitIp','proxyRoute',
   'theme','accent','simulation','refreshMs','latencyProbe','autoReconnect','confirmDelete','autoOpenOnLaunch','panelPort','defaultUser','defaultPort','defaultKeyPath','connectTimeout','serverAliveInterval','serverAliveCountMax','strictHostKeyChecking','openBrowserOnStart','logRetention']);
-const booleanFields = new Set(['autoOpen','simulation','latencyProbe','autoReconnect','confirmDelete','autoOpenOnLaunch','strictHostKeyChecking','openBrowserOnStart']);
+const booleanFields = new Set(['enabled','autoOpen','simulation','latencyProbe','autoReconnect','confirmDelete','autoOpenOnLaunch','strictHostKeyChecking','openBrowserOnStart']);
 const numberFields = new Set(['port','localPort','remotePort','refreshMs','panelPort','defaultPort','connectTimeout','serverAliveInterval','serverAliveCountMax','logRetention']);
 const camel = value => value.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 export function parseArgs(args) {
@@ -133,6 +136,19 @@ export async function run(args,env=process.env) {
       else if(action==='delete') {confirm();result=await call('DELETE',endpoint+'/'+id,{});}
       else if((command==='server'&&['test','command'].includes(action))||(command==='tunnel'&&['open','close','restart','probe','port'].includes(action)))result=await call(action==='port'?'GET':'POST',endpoint+'/'+id+'/'+action,action==='port'?undefined:data);
       else throw new Error('Unknown resource action; use --help');
+    }
+  } else if(command==='browser-profile') {
+    const endpoint='/api/browser-profiles';
+    if(action==='list') {noExtra(2);result=await call('GET',endpoint);}
+    else if(action==='discover') {noExtra(2);result=await call('POST',endpoint+'/discover',{});}
+    else if(action==='add') {noExtra(2);result=await call('POST',endpoint,data);}
+    else {
+      requireId();noExtra(3);
+      if(action==='get')result=await call('GET',endpoint+'/'+id);
+      else if(action==='update')result=await call('PATCH',endpoint+'/'+id,data);
+      else if(action==='delete') {confirm();result=await call('DELETE',endpoint+'/'+id,{});}
+      else if(['apply','open'].includes(action))result=await call('POST',endpoint+'/'+id+'/'+action,{});
+      else throw new Error('浏览器配置操作无效，请使用 --help。');
     }
   } else if(command==='settings') {
     noExtra(2);

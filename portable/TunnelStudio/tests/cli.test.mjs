@@ -49,6 +49,10 @@ await test('CLI automates both resource collections without a browser', async()=
     assert.equal((await cli('startup','status')).autostart.enabled,false);
     assert.equal(typeof (await cli('shortcut','status')).applicationShortcut.enabled,'boolean');
     const bootstrap=await cli('api','GET','/api/bootstrap');assert.ok(!Object.hasOwn(bootstrap,'token'));
+    assert.equal(bootstrap.browserProfileSupport.supported,false);
+    assert.deepEqual(bootstrap.browserProfiles,[]);
+    const profiles=await cli('browser-profile','list');assert.equal(profiles.supported,false);assert.deepEqual(profiles.profiles,[]);
+    for(const args of [['add','--tunnel-id',tunnel.id],['discover'],['get','bp-fixture'],['update','bp-fixture','--enabled','false'],['apply','bp-fixture'],['open','bp-fixture'],['delete','bp-fixture','--yes']])await assert.rejects(cli('browser-profile',...args),/仅支持 Windows/);
     await assert.rejects(cli('batch','close','missing'),error=>error.result.results[0].ok===false);
     await assert.rejects(cli('settings','set','--connect-timeout','0'),/整数/);
     const exported=path.join(root,'export.json');

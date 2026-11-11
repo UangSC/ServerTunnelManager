@@ -5,6 +5,7 @@ import {ROOT,defaults} from '../server/app.mjs';
 const run=process.argv[2],folder=process.argv[3];
 if(!/^~\/.tunnelStudioSync\/.validation-[a-z0-9-]+$/.test(folder))throw Error('只允许独立验收目录');
 const local=fs.mkdtempSync(path.join(ROOT,'tests/run-live-'));
+try {
 const store=new SyncStore(ROOT,{directory:path.relative(ROOT,local),restricted:process.platform!=='win32'});
 store.saveSettings({...store.defaults(),remoteDir:folder});
 const config=defaults();config.servers=[{id:'verify-server',name:'跨平台验收',host:'example.com',port:22,user:'deploy'}];config.tunnels=[];
@@ -14,4 +15,9 @@ if(run==='write'){
   const p=await store.pull(config,false);const merged=store.prepareApply(p.token,config);
   if(merged.servers.length!==1||merged.servers[0].name!=='跨平台验收')throw Error('跨平台数据不一致');
   console.log(JSON.stringify({ok:true,platform:process.platform,operation:'read',servers:merged.servers.length}));
+}
+} finally {
+  const testsRoot=path.resolve(ROOT,'tests');
+  if(path.dirname(path.resolve(local))!==testsRoot||!path.basename(local).startsWith('run-live-'))throw Error('测试清理路径超出允许范围');
+  fs.rmSync(local,{recursive:true,force:true});
 }

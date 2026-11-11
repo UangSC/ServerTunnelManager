@@ -6,6 +6,7 @@ $sourceRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $sourceRoot 'Panel/Core.ps1')
 . (Join-Path $sourceRoot 'Panel/Sync.ps1')
 $testRoot = Join-Path $PSScriptRoot ('run-worker-' + [guid]::NewGuid().ToString('N'))
+try {
 New-Item -ItemType Directory -Path (Join-Path $testRoot 'shared'),(Join-Path $testRoot 'Panel') -Force | Out-Null
 Copy-Item (Join-Path $sourceRoot 'shared/sync.mjs') (Join-Path $testRoot 'shared/sync.mjs')
 $script:RootDir = $testRoot
@@ -49,3 +50,11 @@ try { Apply-SyncPreview @{token=$preview.token;confirm=$true} } catch { $rejecte
 Assert-Sync $rejected 'Windows 已使用预览不能重复覆盖'
 
 Assert-Sync ($script:Config.tunnels[0].kind -eq 'dedicated' -and $script:Config.tunnels[0].proxyAccount -eq '测试账号' -and $script:Config.tunnels[0].proxyExitIp -eq '203.0.113.10' -and $script:Config.tunnels[0].proxyRoute -eq 'vpn') 'Windows worker 保留专用隧道和中文账号'
+} finally {
+    $resolvedTestRoot = [IO.Path]::GetFullPath($testRoot)
+    $resolvedTestsDirectory = [IO.Path]::GetFullPath($PSScriptRoot) + [IO.Path]::DirectorySeparatorChar
+    if (-not $resolvedTestRoot.StartsWith($resolvedTestsDirectory, [StringComparison]::OrdinalIgnoreCase) -or (Split-Path -Leaf $resolvedTestRoot) -notmatch '^run-worker-[0-9a-f]{32}$') {
+        throw '测试清理路径超出允许范围。'
+    }
+    if (Test-Path -LiteralPath $resolvedTestRoot) { Remove-Item -LiteralPath $resolvedTestRoot -Recurse -Force }
+}
